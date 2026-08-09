@@ -897,7 +897,13 @@ class ResearchReportModule:
         for artifact in context.artifacts:
             lines.append(f"- `{artifact.logical_name}` v{artifact.version}: `{artifact.uri}` (sha256 `{artifact.sha256}`)")
         lines.extend(["", "## Evidence gaps and next actions", ""])
-        lines.extend([f"- {gap}" for gap in gaps] or ["- No workflow-reported gaps."])
+        if gaps:
+            lines.extend(f"- {gap}" for gap in gaps)
+        else:
+            lines.append(
+                "- No workflow-reported gaps in the current artifact set "
+                f"({len(context.prior_results)} reviewed module result(s))."
+            )
         lines.extend(["", "## Interpretation boundary", "",
                       "This report records executed work and evidence gaps. It does not convert rankings, model outputs, or retrieval hits into biological truth.", ""])
         path = context.output_dir / "research_report.md"

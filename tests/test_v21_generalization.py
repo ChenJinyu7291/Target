@@ -1,7 +1,6 @@
 import gzip
 import json
 
-import pandas as pd
 import pytest
 
 from target_agent.contracts import (
@@ -229,6 +228,7 @@ def test_recipe_selects_pydeseq2_for_count_file(tmp_path):
 
 
 def test_pydeseq2_preflight_rejects_normalized_expression():
+    pd = pytest.importorskip("pandas")
     frame = pd.DataFrame({
         "gene": ["A", "B"], "control_1": [1.2, 2.3], "control_2": [1.1, 2.4], "control_3": [1.0, 2.1],
         "case_1": [3.4, 4.2], "case_2": [3.2, 4.1], "case_3": [3.3, 4.0],
@@ -243,6 +243,7 @@ def test_pydeseq2_preflight_rejects_normalized_expression():
 
 
 def test_pydeseq2_preserves_unlabelled_gene_index():
+    pd = pytest.importorskip("pandas")
     frame = pd.DataFrame(
         [[10, 11, 9, 30, 31, 29], [5, 4, 6, 7, 8, 7]],
         index=["GENE_A", "GENE_B"],
@@ -284,6 +285,7 @@ def test_single_cell_missing_donor_metadata_is_not_formal_evidence(tmp_path):
     ad = pytest.importorskip("anndata")
     np = pytest.importorskip("numpy")
     pytest.importorskip("scanpy")
+    pd = pytest.importorskip("pandas")
     data = ad.AnnData(
         X=np.ones((12, 5), dtype=int),
         obs=pd.DataFrame({"cell_type": ["T cell"] * 12, "condition": ["control"] * 6 + ["case"] * 6}),
@@ -305,6 +307,7 @@ def test_single_cell_runs_donor_level_pseudobulk(tmp_path):
     ad = pytest.importorskip("anndata")
     np = pytest.importorskip("numpy")
     pytest.importorskip("scanpy")
+    pd = pytest.importorskip("pandas")
     rng = np.random.default_rng(7)
     donors = [f"d{index}" for index in range(6)]
     conditions = ["control"] * 3 + ["case"] * 3
@@ -367,3 +370,72 @@ def test_analysis_cache_locate_migrates_legacy_key(tmp_path):
     assert path.parent.name == key
     path2, key2, mode2 = _analysis_cache_locate(tool_context, recipe, "abc", "2.1.1")
     assert mode2 == "new" and key2 == key
+
+
+def test_metadata_audit_rejects_disease_mismatch_and_unverifiable_units(tmp_path):
+    ids = [f"GSM{i}" for i in range(1, 7)]
+    titles = [
+        "control brain", "control brain", "control brain",
+        "Alzheimer brain", "Alzheimer brain", "Alzheimer brain",
+    ]
+    matrix = "\n".join([
+        "!Sample_geo_accession\t" + "\t".join(f'"{value}"' for value in ids),
+        "!Sample_title\t" + "\t".join(f'"{value}"' for value in titles),
+        "!Sample_source_name_ch1\t" + "\t".join('"brain"' for _ in ids),
+        "!series_matrix_table_begin", '"ID_REF"\t' + "\t".join(f'"{value}"' for value in ids),
+        '"GENE1"\t1\t2\t3\t8\t9\t10', "!series_matrix_table_end",
+    ])
+    candidate = DatasetCandidate(
+        accession="GSE53697", source="GEO", title="Crohn study", organism="Homo sapiens",
+        disease="Crohn disease",
+        source_uri="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE53697",
+        context_match_score=1.0,
+    )
+    search = ToolResult(
+        tool_name="geo_search", tool_version="test", status=ToolStatus.SUCCESS,
+        coverage_status=CoverageStatus.COVERED, context_match_score=1,
+        outputs={"dataset_candidates": [candidate.model_dump(mode="json")]}, capability=ToolCapability(),
+    )
+    execution = GEOMetadataAuditTool(session=GeoAuditSession(matrix)).run(context(tmp_path, prior=[search]))
+    rejected = execution.result.outputs["rejected_datasets"]
+    assert rejected
+    reasons = rejected[0]["candidate"]["exclusion_reasons"]
+    assert "disease_context_mismatch" in reasons
+    assert "biological_unit_unverifiable" in reasons
+    assert rejected[0]["biological_unit_coverage"] < 1.0
+    assert rejected[0]["biological_unit_fallback_samples"]
+
+
+def test_continuous_expression_rejects_raw_counts_and_marks_log_scale(tmp_path):
+    import pandas as pd
+
+    from target_agent.tools.omics import _prepare_continuous_expression
+
+    recipe = AnalysisRecipe(
+        accession="GSETEST", data_kind="bulk_continuous_expression", backend="limma",
+        input_uri="https://ftp.ncbi.nlm.nih.gov/test.tsv",
+        group_mapping={
+            "control_1": "control", "control_2": "control", "control_3": "control",
+            "case_1": "case", "case_2": "case", "case_3": "case",
+        },
+        design="~condition", contrast=["condition", "case", "control"],
+        parameters={"sample_aliases": {}, "biological_units": {}},
+    )
+    raw_counts = pd.DataFrame(
+        [[10000, 11000, 9000, 30000, 31000, 29000], [5000, 4000, 6000, 7000, 8000, 7000]],
+        index=["GENE_A", "GENE_B"],
+        columns=["control_1", "control_2", "control_3", "case_1", "case_2", "case_3"],
+    )
+    with pytest.raises(ValueError, match="raw or unlogged"):
+        _prepare_continuous_expression(raw_counts, recipe, 3)
+    log_scale = pd.DataFrame(
+        [[-1.2, -1.1, -1.0, 1.4, 1.3, 1.2], [0.5, 0.4, 0.6, 2.1, 2.2, 2.0]],
+        index=["GENE_A", "GENE_B"],
+        columns=["control_1", "control_2", "control_3", "case_1", "case_2", "case_3"],
+    )
+    expression, metadata, gene_column, normalization_unverified = _prepare_continuous_expression(
+        log_scale, recipe, 3
+    )
+    assert normalization_unverified is False
+    assert expression.shape[0] == 6
+    assert gene_column == "__index__"

@@ -243,6 +243,8 @@ def _normalize_coloc(row: dict[str, str], asset: EqtlColocalizationResultInput) 
         "eqtl_effect_allele": eqtl_variant["effect_allele"],
         "eqtl_other_allele": eqtl_variant["other_allele"],
         "eqtl_beta": _float(_column(row, columns.eqtl_beta, "eqtl_beta"), "eqtl_beta"),
+        "gwas_effect_allele_frequency": _float(gwas_eaf, "gwas_effect_allele_frequency") if (gwas_eaf := _column(row, columns.gwas_effect_allele_frequency, "gwas_effect_allele_frequency", required=False)) is not None else None,
+        "eqtl_effect_allele_frequency": _float(eqtl_eaf, "eqtl_effect_allele_frequency") if (eqtl_eaf := _column(row, columns.eqtl_effect_allele_frequency, "eqtl_effect_allele_frequency", required=False)) is not None else None,
         **probabilities, "n_variants": n_variants,
     }
 
@@ -275,6 +277,8 @@ def _normalize_harmonized_variant(
         "gwas_other_allele": gwas_variant["other_allele"],
         "eqtl_effect_allele": eqtl_variant["effect_allele"],
         "eqtl_other_allele": eqtl_variant["other_allele"],
+        "gwas_effect_allele_frequency": _float(gwas_eaf, "gwas_effect_allele_frequency") if (gwas_eaf := _column(row, columns.gwas_effect_allele_frequency, "gwas_effect_allele_frequency", required=False)) is not None else None,
+        "eqtl_effect_allele_frequency": _float(eqtl_eaf, "eqtl_effect_allele_frequency") if (eqtl_eaf := _column(row, columns.eqtl_effect_allele_frequency, "eqtl_effect_allele_frequency", required=False)) is not None else None,
     }
 
 
@@ -630,27 +634,108 @@ class FineMappingAuditTool(ScientificTool):
         return ToolExecution(result=result, evidence=[])
 
 
-def _context_match(context: ToolContext, asset: EqtlColocalizationResultInput) -> float:
+_TISSUE_SYNONYMS = {
+    "lung": {"lung", "pulmonary", "bronchus", "bronchial", "alveolar", "alveolus", "lung tissue", "lung parenchyma", "pneumocyte"},
+    "blood": {"blood", "whole blood", "peripheral blood", "peripheral blood mononuclear cell", "pbmc", "blood-derived"},
+    "colon": {"colon", "colonic", "colonic mucosa", "large intestine", "colorectal", "intestinal", "gut", "bowel"},
+    "brain": {"brain", "cerebral", "cortex", "cortical", "hippocampus", "hippocampal", "cerebellum", "cerebellar", "frontal", "prefrontal", "cerebrospinal"},
+    "liver": {"liver", "hepatic", "hepatocyte", "hepatocellular"},
+    "kidney": {"kidney", "renal", "nephron", "glomerular"},
+    "heart": {"heart", "cardiac", "myocardial", "myocardium"},
+    "skin": {"skin", "dermal", "epidermal", "cutaneous"},
+    "muscle": {"muscle", "skeletal muscle", "myocyte", "smooth muscle"},
+    "breast": {"breast", "mammary"},
+    "prostate": {"prostate", "prostatic"},
+    "pancreas": {"pancreas", "pancreatic"},
+    "spleen": {"spleen", "splenic"},
+    "bone_marrow": {"bone marrow", "marrow"},
+    "lymph_node": {"lymph node", "lymph node tissue", "lymphatic"},
+    "adipose": {"adipose", "adipocyte", "fat"},
+    "testis": {"testis", "testicular"},
+    "ovary": {"ovary", "ovarian"},
+}
+
+_CELL_SYNONYMS = {
+    "t cell": {"t cell", "t-cell", "t cells", "t lymphocyte", "t lymphocytes", "cd4", "cd8", "cd4+ t cell", "cd8+ t cell", "regulatory t cell", "treg", "cytotoxic t cell", "helper t cell"},
+    "b cell": {"b cell", "b-cell", "b cells", "b lymphocyte", "b lymphocytes", "plasma cell", "plasma b cell"},
+    "nk cell": {"nk cell", "nk cells", "natural killer cell", "natural killer cells"},
+    "macrophage": {"macrophage", "macrophages", "monocyte-derived macrophage", "m1 macrophage", "m2 macrophage", "kupffer cell", "alveolar macrophage", "microglia"},
+    "monocyte": {"monocyte", "monocytes", "cd14", "cd14+ monocyte"},
+    "dendritic cell": {"dendritic cell", "dendritic cells", "plasmacytoid dendritic cell", "cdc"},
+    "neutrophil": {"neutrophil", "neutrophils"},
+    "fibroblast": {"fibroblast", "fibroblasts", "fibroblast-like", "stromal", "stroma", "caf"},
+    "endothelial cell": {"endothelial", "endothelium", "endothelial cell", "endothelial cells"},
+    "epithelial cell": {"epithelial", "epithelium", "epithelial cell", "epithelial cells", "enterocyte", "enterocytes", "alveolar type ii", "alveolar type ii cell", "at2", "alveolar type i", "alveolar type i cell"},
+    "neuron": {"neuron", "neurons", "neuronal", "excitatory neuron", "inhibitory neuron", "glutamatergic neuron", "gabaergic neuron"},
+    "astrocyte": {"astrocyte", "astrocytes"},
+    "oligodendrocyte": {"oligodendrocyte", "oligodendrocytes"},
+    "hepatocyte": {"hepatocyte", "hepatocytes"},
+    "smooth muscle cell": {"smooth muscle", "smooth muscle cell", "smc"},
+    "skeletal muscle cell": {"skeletal muscle", "skeletal muscle cell", "myocyte", "myocytes"},
+    "cardiac muscle cell": {"cardiac muscle", "cardiomyocyte", "cardiomyocytes", "cardiac myocyte"},
+    "adipocyte": {"adipocyte", "adipocytes", "fat cell"},
+    "stem cell": {"stem cell", "stem cells", "hematopoietic stem cell", "hsc", "ipsc", "ips cell"},
+}
+
+
+def _context_token_canonical(term: str, synonym_map: dict[str, set[str]]) -> tuple[str | None, str]:
+    tokens = set(re.findall(r"[a-z0-9]+", term.casefold().replace("-", " ")))
+    for canonical, aliases in synonym_map.items():
+        canonical_tokens = set(re.findall(r"[a-z0-9]+", canonical.replace("-", " ")))
+        if canonical_tokens and canonical_tokens <= tokens:
+            return canonical, "canonical"
+        for alias in aliases:
+            alias_tokens = set(re.findall(r"[a-z0-9]+", alias.replace("-", " ")))
+            if alias_tokens and alias_tokens <= tokens:
+                return canonical, "synonym"
+    return None, "unknown"
+
+
+def _term_match(requested: str, observed: str, synonym_map: dict[str, set[str]]) -> tuple[float, list[str], str]:
+    if requested == observed:
+        return 1.0, [requested], "exact"
+    requested_canon, _ = _context_token_canonical(requested, synonym_map)
+    observed_canon, _ = _context_token_canonical(observed, synonym_map)
+    if requested_canon and requested_canon == observed_canon:
+        return 1.0, [observed], "synonym"
+    requested_tokens = set(re.findall(r"[a-z0-9]+", requested))
+    observed_tokens = set(re.findall(r"[a-z0-9]+", observed))
+    overlap = requested_tokens & observed_tokens
+    if overlap:
+        return 0.85, sorted(overlap), "token_overlap"
+    if requested in observed or observed in requested:
+        return 0.6, [], "substring"
+    return 0.3, [], "no_match"
+
+
+def _context_match_detail(context: ToolContext, asset: EqtlColocalizationResultInput) -> tuple[float, dict[str, Any]]:
     requested_tissue = (context.task.context.tissue or "").casefold()
     observed_tissue = asset.tissue.casefold()
+    matched: list[str] = []
+    rules: list[str] = []
     if not requested_tissue:
         score = 0.3
-    elif requested_tissue == observed_tissue or requested_tissue in observed_tissue or observed_tissue in requested_tissue:
-        score = 1.0
+        rules.append("tissue:no_requested")
     else:
-        score = 0.3
+        tissue_score, tissue_terms, tissue_rule = _term_match(requested_tissue, observed_tissue, _TISSUE_SYNONYMS)
+        score = tissue_score
+        matched.extend(tissue_terms)
+        rules.append(f"tissue:{tissue_rule}")
     if context.task.context.cell_type:
         requested_cell = context.task.context.cell_type.casefold()
         if not asset.cell_type:
             score = min(score, 0.3)
+            rules.append("cell_type:no_asset")
         else:
-            observed_cell = asset.cell_type.casefold()
-            if (
-                requested_cell != observed_cell
-                and requested_cell not in observed_cell
-                and observed_cell not in requested_cell
-            ):
-                score = min(score, 0.3)
+            cell_score, cell_terms, cell_rule = _term_match(requested_cell, asset.cell_type.casefold(), _CELL_SYNONYMS)
+            score = min(score, cell_score)
+            matched.extend(cell_terms)
+            rules.append(f"cell_type:{cell_rule}")
+    return round(score, 3), {"matched_terms": list(dict.fromkeys(matched)), "match_rules": rules}
+
+
+def _context_match(context: ToolContext, asset: EqtlColocalizationResultInput) -> float:
+    score, _ = _context_match_detail(context, asset)
     return score
 
 
@@ -668,10 +753,18 @@ def _harmonize_alleles(
     ):
         return "palindromic_ambiguous_without_informative_frequency", None
     if (gwas["effect_allele"], gwas["other_allele"]) == (coloc["eqtl_effect_allele"], coloc["eqtl_other_allele"]):
-        return "direct", 1
-    if (gwas["effect_allele"], gwas["other_allele"]) == (coloc["eqtl_other_allele"], coloc["eqtl_effect_allele"]):
-        return "swapped", -1
-    return "orientation_unresolved", None
+        sign = 1
+    elif (gwas["effect_allele"], gwas["other_allele"]) == (coloc["eqtl_other_allele"], coloc["eqtl_effect_allele"]):
+        sign = -1
+    else:
+        return "orientation_unresolved", None
+    gwas_eaf = gwas.get("effect_allele_frequency")
+    eqtl_eaf = coloc.get("eqtl_effect_allele_frequency")
+    if gwas_eaf is not None and eqtl_eaf is not None:
+        expected = float(eqtl_eaf) if sign == 1 else 1.0 - float(eqtl_eaf)
+        if abs(float(gwas_eaf) - expected) > 0.15:
+            return "eaf_inconsistent", None
+    return ("direct" if sign == 1 else "swapped"), sign
 
 
 def _harmonize(
@@ -786,7 +879,7 @@ class EqtlColocalizationAuditTool(ScientificTool):
                 reasons.append("coloc_sensitivity_not_passed")
             if asset.sample_overlap == "unknown":
                 reasons.append("sample_overlap_unresolved")
-            context_score = _context_match(context, asset)
+            context_score, context_detail = _context_match_detail(context, asset)
             if context_score < 0.5:
                 reasons.append("eqtl_context_mismatch")
             if asset.eqtl_ancestry.casefold() != asset.ancestry.casefold():
@@ -811,7 +904,7 @@ class EqtlColocalizationAuditTool(ScientificTool):
                 "regional_variants_harmonized": regional_valid,
                 "regional_harmonization_failures": dict(sorted(regional_failures.items())),
                 "harmonized_variant_manifest_sha256": asset.harmonized_variants.sha256,
-                "context_match_score": context_score, "formal_score_eligible": not reasons,
+                "context_match_score": context_score, "context_match_detail": context_detail, "formal_score_eligible": not reasons,
                 "rejection_reasons": list(dict.fromkeys(reasons)), "causal_status": "not_established",
                 "assumptions": [
                     "colocalization posterior depends on supplied priors and regional variant coverage",

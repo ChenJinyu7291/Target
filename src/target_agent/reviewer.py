@@ -65,9 +65,15 @@ class Reviewer:
                 ))
             causal_words = (
                 "causes", "causal evidence", "drives disease", "proves", "is causal",
-                "causal target", "致病", "因果靶点", "证明因果",
+                "causal target", "is causative", "confers risk", "causal role",
+                "cause of", "causal effect", "致病", "因果靶点", "证明因果",
+                "导致", "驱动疾病", "引起", "因果证据",
             )
-            if any(word in item.statement.lower() for word in causal_words):
+            scanned_text = " | ".join(filter(None, (
+                item.statement, item.uncertainty,
+                json.dumps(item.effect, ensure_ascii=False) if item.effect else "",
+            ))).lower()
+            if any(word in scanned_text for word in causal_words):
                 findings.append(ReviewerFinding(
                     severity="major", category="causal_overreach",
                     message=f"Evidence {item.evidence_id} uses causal language beyond its evidence class.",
@@ -315,6 +321,7 @@ class Reviewer:
                 "tool_run_id": result.tool_run_id, "tool_name": result.tool_name,
                 "status": result.status.value, "coverage_status": result.coverage_status.value,
                 "context_match_score": result.context_match_score,
+                "data_version": result.data_version, "code_version": result.code_version,
                 "warnings": result.warnings, "limitations": result.limitations,
                 "outputs": {
                     key: value for key, value in result.outputs.items()
@@ -329,6 +336,20 @@ class Reviewer:
                 "claim_class": item.claim_class.value, "statement": item.statement,
                 "context": item.context.model_dump(mode="json"),
                 "context_match_score": item.context_match_score,
+                "source_span": (item.source_span or "")[:400],
+                "quality_flags": list(item.quality_flags or []),
+                "effect": {
+                    key: str(value)[:120] for key, value in (item.effect or {}).items()
+                },
+                "genetic": (
+                    {
+                        "formal_score_eligible": item.genetic_evidence.formal_score_eligible,
+                        "evidence_type": item.genetic_evidence.evidence_type,
+                        "analysis_level": item.genetic_evidence.analysis_level,
+                        "strength": item.genetic_evidence.strength,
+                    }
+                    if item.genetic_evidence is not None else None
+                ),
             }
             for item in evidence[:100]
         ]

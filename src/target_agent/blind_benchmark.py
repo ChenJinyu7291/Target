@@ -256,7 +256,7 @@ def evaluate_case(case: BlindCaseManifest, labels: BlindCaseLabels, runs_root: P
         terms_match = all(term.casefold() in blocker_text for term in expectation.required_blocker_terms)
         if row.decision in expectation.allowed_decisions and terms_match:
             correctly_blocked += 1
-        if row.decision == "GO":
+        if row.decision == "GO" and "GO" not in expectation.allowed_decisions:
             unsafe_go += 1
 
     return {

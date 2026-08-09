@@ -173,6 +173,19 @@
       ],
       "default": null,
       "title": "Repair Request Id"
+    },
+    "fork_branch_id": {
+      "anyOf": [
+        {
+          "pattern": "^branch-[a-f0-9]{24}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fork Branch Id"
     }
   },
   "required": [

@@ -1,0 +1,86 @@
+{
+  "additionalProperties": false,
+  "description": "Immutable set of artifact/result digests that a Reviewer may assess.",
+  "properties": {
+    "contract_version": {
+      "const": "3.0.0",
+      "default": "3.0.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "review_target_id": {
+      "pattern": "^review-target-[a-f0-9]{24}$",
+      "title": "Review Target Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "work_item",
+        "release",
+        "repair"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "work_item_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Work Item Id"
+    },
+    "work_item_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Work Item Ids",
+      "type": "array"
+    },
+    "result_digests": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Result Digests",
+      "type": "object"
+    },
+    "artifact_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Artifact Ids",
+      "type": "array"
+    },
+    "snapshot_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Snapshot Digest",
+      "type": "string"
+    },
+    "reason": {
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "review_target_id",
+    "project_id",
+    "scope",
+    "snapshot_digest",
+    "reason"
+  ],
+  "title": "ReviewTarget",
+  "type": "object"
+}

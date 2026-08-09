@@ -13,22 +13,21 @@
       "title": "FailureClass",
       "type": "string"
     },
-    "WorkItemStatus": {
+    "WorkAttemptStatus": {
       "enum": [
         "pending",
         "running",
         "completed",
         "completed_with_gaps",
-        "needs_input",
-        "blocked",
         "failed",
-        "skipped"
+        "cancelled"
       ],
-      "title": "WorkItemStatus",
+      "title": "WorkAttemptStatus",
       "type": "string"
     }
   },
   "additionalProperties": false,
+  "description": "Immutable attempt record for one work-item execution.",
   "properties": {
     "contract_version": {
       "const": "3.0.0",
@@ -36,46 +35,82 @@
       "title": "Contract Version",
       "type": "string"
     },
-    "item_id": {
-      "title": "Item Id",
+    "attempt_id": {
+      "pattern": "^attempt-[a-f0-9]{24}$",
+      "title": "Attempt Id",
       "type": "string"
     },
-    "module": {
-      "title": "Module",
+    "project_id": {
+      "title": "Project Id",
       "type": "string"
+    },
+    "work_item_id": {
+      "title": "Work Item Id",
+      "type": "string"
+    },
+    "attempt_number": {
+      "maximum": 3,
+      "minimum": 1,
+      "title": "Attempt Number",
+      "type": "integer"
     },
     "status": {
-      "$ref": "#/$defs/WorkItemStatus"
+      "$ref": "#/$defs/WorkAttemptStatus"
     },
-    "summary": {
-      "title": "Summary",
+    "input_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Input Digest",
       "type": "string"
     },
-    "outputs": {
-      "additionalProperties": true,
-      "title": "Outputs",
-      "type": "object"
+    "output_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Output Digest"
     },
-    "artifact_ids": {
-      "items": {
-        "type": "string"
-      },
-      "title": "Artifact Ids",
-      "type": "array"
+    "worker_lease_id": {
+      "anyOf": [
+        {
+          "pattern": "^lease-[a-f0-9]{24}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Worker Lease Id"
     },
-    "evidence_refs": {
-      "items": {
-        "type": "string"
-      },
-      "title": "Evidence Refs",
-      "type": "array"
+    "supersedes_attempt_id": {
+      "anyOf": [
+        {
+          "pattern": "^attempt-[a-f0-9]{24}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes Attempt Id"
     },
-    "limitations": {
-      "items": {
-        "type": "string"
-      },
-      "title": "Limitations",
-      "type": "array"
+    "failure_class": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FailureClass"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "error": {
       "anyOf": [
@@ -89,84 +124,35 @@
       "default": null,
       "title": "Error"
     },
-    "failure_class": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/FailureClass"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null
-    },
-    "input_digest": {
-      "anyOf": [
-        {
-          "pattern": "^[0-9a-f]{64}$",
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Input Digest"
-    },
-    "supersedes_result_digest": {
-      "anyOf": [
-        {
-          "pattern": "^[0-9a-f]{64}$",
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Supersedes Result Digest"
-    },
-    "repair_request_id": {
-      "anyOf": [
-        {
-          "pattern": "^repair-[a-f0-9]{24}$",
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Repair Request Id"
-    },
-    "fork_branch_id": {
-      "anyOf": [
-        {
-          "pattern": "^branch-[a-f0-9]{24}$",
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Fork Branch Id"
-    },
     "started_at": {
       "title": "Started At",
       "type": "string"
     },
     "completed_at": {
-      "title": "Completed At",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Completed At"
+    },
+    "created_at": {
+      "title": "Created At",
       "type": "string"
     }
   },
   "required": [
-    "item_id",
-    "module",
+    "attempt_id",
+    "project_id",
+    "work_item_id",
+    "attempt_number",
     "status",
-    "summary"
+    "input_digest"
   ],
-  "title": "WorkItemResult",
+  "title": "WorkAttempt",
   "type": "object"
 }

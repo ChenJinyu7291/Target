@@ -362,7 +362,9 @@ def test_open_targets_splits_genetic_and_somatic_scores_without_formal_genetic_c
         candidate_genes=["IL6"], prior_results=[], settings=settings,
     )
     tool = OpenTargetsTool()
-    monkeypatch.setattr(tool, "_retrieve", lambda *args, **kwargs: (payload, False))
+    monkeypatch.setattr(tool, "_retrieve", lambda *args, **kwargs: (
+        payload, False, {"retrieved_at": "2026-01-01T00:00:00Z", "response_digest": "fixture-digest", "cached": False}
+    ))
 
     execution = tool.run(context)
     association = execution.result.outputs["associations"][0]
@@ -397,7 +399,9 @@ def test_open_targets_with_no_associations_is_not_covered(monkeypatch, tmp_path)
         "target_clinical_candidates": {}, "clinical_warning": None,
     }
     tool = OpenTargetsTool()
-    monkeypatch.setattr(tool, "_retrieve", lambda *args, **kwargs: (payload, False))
+    monkeypatch.setattr(tool, "_retrieve", lambda *args, **kwargs: (
+        payload, False, {"retrieved_at": "2026-01-01T00:00:00Z", "response_digest": "fixture-digest", "cached": False}
+    ))
     execution = tool.run(ToolContext(
         task=TaskSpec(
             task_type="disease_to_target", question="Find targets",
@@ -412,6 +416,47 @@ def test_open_targets_with_no_associations_is_not_covered(monkeypatch, tmp_path)
     assert execution.result.outputs["covered"] is False
     assert execution.result.candidate_genes == []
     assert "no_inherited_genetic_association_for_selected_targets" in execution.result.warnings
+
+
+def test_open_targets_records_snapshot_meta_on_evidence_and_outputs(monkeypatch, tmp_path):
+    payload = {
+        "data": {
+            "disease": {
+                "id": "EFO_TEST", "name": "test disease",
+                "associatedTargets": {
+                    "rows": [
+                        {
+                            "score": 0.9,
+                            "datatypeScores": [{"id": "genetic_association", "score": 0.3}],
+                            "target": {
+                                "id": "ENSG-IL6", "approvedSymbol": "IL6",
+                                "approvedName": "interleukin 6", "biotype": "protein_coding",
+                            },
+                        },
+                    ],
+                },
+            },
+        },
+        "resolved_disease_id": "EFO_TEST",
+        "selected_genetic_symbols": ["IL6"],
+        "target_clinical_candidates": {},
+        "clinical_warning": None,
+    }
+    tool = OpenTargetsTool()
+    monkeypatch.setattr(tool, "_retrieve", lambda *args, **kwargs: (
+        payload, False, {"retrieved_at": "2026-01-01T00:00:00Z", "response_digest": "abc123", "cached": False}
+    ))
+    execution = tool.run(ToolContext(
+        task=TaskSpec(
+            task_type="disease_to_target", question="Find targets",
+            context=TaskContext(disease="test disease", disease_id="EFO_TEST"),
+        ),
+        run_dir=tmp_path, cache_dir=tmp_path / "cache",
+        candidate_genes=["IL6"], prior_results=[],
+    ))
+    assert execution.result.outputs["snapshot_meta"]["response_digest"] == "abc123"
+    assert execution.evidence[0].source.version_meta["response_digest"] == "abc123"
+    assert execution.evidence[0].source.version_meta["retrieved_at"] == "2026-01-01T00:00:00Z"
 
 
 def test_formal_genetic_payload_cannot_be_attached_to_a_different_gene():

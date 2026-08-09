@@ -75,6 +75,14 @@ def test_clinical_trials_gene_named_only(tmp_path):
     assert "Phase 2" in ev.statement
 
 
+def test_clinical_trials_records_snapshot_meta(tmp_path):
+    tool = ClinicalTrialsGovTool(session=TrialsSession())
+    out = tool.run(ctx(tmp_path, genes=["IL2"]))
+    assert out.result.outputs["snapshot_meta"]["response_digest"]
+    assert out.evidence[0].source.version_meta["response_digest"]
+    assert out.evidence[0].source.version_meta["retrieved_at"]
+
+
 def test_clinical_trials_stopped_flagged_and_cache_only_fails(tmp_path):
     payload = {"studies": [{"protocolSection": {
         "identificationModule": {"nctId": "NCT00000003", "briefTitle": "CD27 agonist trial"},

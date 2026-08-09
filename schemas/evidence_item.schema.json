@@ -5,6 +5,7 @@
         "FACT",
         "OBSERVED",
         "PREDICTED",
+        "UNVERIFIED",
         "INFERRED"
       ],
       "title": "ClaimClass",
@@ -366,6 +367,32 @@
           "default": null,
           "title": "Version"
         },
+        "sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        },
+        "version_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version Meta"
+        },
         "section": {
           "anyOf": [
             {
@@ -520,6 +547,19 @@
       "minimum": 0.0,
       "title": "Context Match Score",
       "type": "number"
+    },
+    "context_match": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Context Match"
     },
     "genetic_evidence": {
       "anyOf": [

@@ -54,6 +54,7 @@
         "FACT",
         "OBSERVED",
         "PREDICTED",
+        "UNVERIFIED",
         "INFERRED"
       ],
       "title": "ClaimClass",
@@ -313,7 +314,8 @@
             "disease",
             "cell_state",
             "drug",
-            "lane"
+            "lane",
+            "strategy_paper"
           ],
           "title": "Node Type",
           "type": "string"

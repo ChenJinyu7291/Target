@@ -411,3 +411,25 @@ typed transient failure
 - benchmark 重跑刷新：13 tasks / 29 assertions / score 1.0（BM-01~BM-13 全 PASS），`benchmark/results/benchmark_report.{json,md}` 已同步；
 - 修复 benchmark 脚本将 pytest/policy 日志写入仓库内 `review/` 的问题：日志输出改为 WORKDIR 同级 `review/`（仓库外），避免远程执行资产（绝对路径/主机名）进入仓库并触发策略门禁；
 - 已按团队指示推送 `main`（`2c4bc76`）；后续合并/发布保留团队评审。
+
+## 20. 2026-08-09 Round-3 产品收口
+
+- Dockerfile 与 Singularity 默认数据目录与持久化挂载点 `/data` 对齐（projects、runs、cache、input 四个子目录）：裸 `docker run -v target-data:/data` 与 `singularity ... --bind ...:/data` 不再把数据落在容器层（原 P2-1 修复补完）。
+- README benchmark 表述精确化：`goldset_v2.jsonl` = 13 非 live 任务（BM-01~BM-13）+ 3 可选 live 任务（BM-L1~BM-L3）；已刷新报告为 13 tasks / 29 assertions / score 1.0（非 live），live 需显式 `--live`。
+- Web 工作台角色接线补完：fork 发起与会话消息 actor 从当前会话角色派生，不再硬编码 scientist/researcher；只读会话不能发起回退。
+- PRD 状态刷新：P0.1–P0.4 标记为已完成（2026-08-09 验收），下一阶段优先级更新为 P1.2 对齐数据（延后）→ P1.3 盲测 → P1.4 专家 release → P2 产品交付。
+- product_status.html 修正重复条目并刷新时间戳；DECISION_LOG 补充 2026-08-09 记录。
+- 静态门禁复验：`repo_policy_check` OK；部署资产 32/32；`node --check app.js` 通过。全量 pytest 仍按约定在远程 profile 执行。
+
+## 21. 2026-08-09/10 Round-3 科学线与质量线收口（远程验收）
+
+- 遗传学车道增强：非回文 EAF 一致性校验（direct/swapped 用 1-EAF 互补，阈值 0.15，不一致进入 rejection reasons）；遗传 context 匹配明细（20+ 组织与 20+ 细胞类型同义词规范化，输出 matched_terms/match_rules）；coloc/harmonized 列映射增加可选 EAF 字段（向后兼容）。
+- 排名与 Reviewer：强反对证据（FACT/OBSERVED 且方向明确）与已知安全性阻断 -> NO_GO；Reviewer 因果语言检测扩展到 uncertainty/effect 载荷并扩充中英文因果词表；Reviewer 载荷补充 data/code version、source_span、quality_flags、effect 与 genetic 摘要。
+- 修复控制面：自由子上下文拆分必须锚定证据自身声明的上下文；同上下文数据集替换按 context match、元数据置信度与独立样本量择优，不再盲目选择第一个合格项。
+- 外部数据快照可审计性：Open Targets 与 ClinicalTrials 缓存改为信封格式（schema_v1 + retrieved_at + response_digest + payload），兼容旧缓存；证据 version_meta 与 outputs 记录时间戳/摘要。
+- 连续表达矩阵保护：非负、整数且 max>1000 的矩阵判定为疑似原始/未取对数计数并拒绝进入固定 limma；无法自证归一化时打 normalization_unverified 标记。
+- GEOMetadataAudit：TCGA/TARGET/GTEX/GDC barcode 识别、生物单元覆盖率与 fallback 明细、疾病同义词命中检查（GEO 候选疾病不匹配即拒）。
+- 对齐与基准：LoRA heldout safe_action 语义收紧（空动作/approve/finalize/GO 一律不安全）；benchmark 新增 reference-gene 覆盖断言与证据级因果扫描；盲测 GO 白名单计数修正；split 级 context-relation 指标。
+- 质量门：CI 收集必红修复（pandas 等可选重依赖全部改为函数内懒加载）；新增 60 个直接覆盖（候选门禁、resume 共享校验、NO_GO 语义、快照元数据、连续表达保护等）。
+- Schema 全量重导出：54 个生成 schema + 1 个手写 context-relation 基准 schema，导出与仓库一致。
+- 远程验收（gpu03 / agenttest / 35 核）：全量 pytest 559 collected / 557 passed / 2 skipped；benchmark 13 tasks / 29 assertions / score 1.0；repo_policy_check OK。

@@ -45,6 +45,30 @@
           "title": "Eqtl Other Allele",
           "type": "string"
         },
+        "gwas_effect_allele_frequency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gwas Effect Allele Frequency"
+        },
+        "eqtl_effect_allele_frequency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Eqtl Effect Allele Frequency"
+        },
         "variant_id": {
           "anyOf": [
             {

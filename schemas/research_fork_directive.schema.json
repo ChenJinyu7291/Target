@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "ForkMode": {
+      "description": "How a user-issued rollback should behave.",
+      "enum": [
+        "redo",
+        "restore"
+      ],
+      "title": "ForkMode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Immutable user-issued intent to roll a project back to a work item.",
+  "properties": {
+    "contract_version": {
+      "const": "3.0.0",
+      "default": "3.0.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "fork_directive_id": {
+      "pattern": "^fork-[a-f0-9]{24}$",
+      "title": "Fork Directive Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "branch_id": {
+      "pattern": "^branch-[a-f0-9]{24}$",
+      "title": "Branch Id",
+      "type": "string"
+    },
+    "target_work_item_id": {
+      "title": "Target Work Item Id",
+      "type": "string"
+    },
+    "mode": {
+      "$ref": "#/$defs/ForkMode"
+    },
+    "rollback_to_attempt_id": {
+      "anyOf": [
+        {
+          "pattern": "^attempt-[a-f0-9]{24}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rollback To Attempt Id"
+    },
+    "snapshot_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Snapshot Digest",
+      "type": "string"
+    },
+    "input_overrides": {
+      "additionalProperties": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Input Overrides",
+      "type": "object"
+    },
+    "rationale": {
+      "minLength": 1,
+      "title": "Rationale",
+      "type": "string"
+    },
+    "actor": {
+      "minLength": 1,
+      "title": "Actor",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "fork_directive_id",
+    "project_id",
+    "branch_id",
+    "target_work_item_id",
+    "mode",
+    "snapshot_digest",
+    "rationale",
+    "actor"
+  ],
+  "title": "ForkDirective",
+  "type": "object"
+}

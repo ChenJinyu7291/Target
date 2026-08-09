@@ -72,7 +72,8 @@
             "plan",
             "work_item",
             "repair",
-            "release"
+            "release",
+            "fork"
           ],
           "type": "string"
         },

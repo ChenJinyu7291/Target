@@ -1,0 +1,76 @@
+{
+  "additionalProperties": false,
+  "description": "CAS-bound claim that one worker may execute one work item attempt.",
+  "properties": {
+    "contract_version": {
+      "const": "3.0.0",
+      "default": "3.0.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "lease_id": {
+      "pattern": "^lease-[a-f0-9]{24}$",
+      "title": "Lease Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "work_item_id": {
+      "title": "Work Item Id",
+      "type": "string"
+    },
+    "attempt_id": {
+      "pattern": "^attempt-[a-f0-9]{24}$",
+      "title": "Attempt Id",
+      "type": "string"
+    },
+    "worker_id": {
+      "minLength": 1,
+      "title": "Worker Id",
+      "type": "string"
+    },
+    "version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "acquired_at": {
+      "title": "Acquired At",
+      "type": "string"
+    },
+    "expires_at": {
+      "minLength": 1,
+      "title": "Expires At",
+      "type": "string"
+    },
+    "heartbeat_at": {
+      "title": "Heartbeat At",
+      "type": "string"
+    },
+    "released_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Released At"
+    }
+  },
+  "required": [
+    "lease_id",
+    "project_id",
+    "work_item_id",
+    "attempt_id",
+    "worker_id",
+    "expires_at"
+  ],
+  "title": "WorkerLease",
+  "type": "object"
+}

@@ -1,0 +1,86 @@
+{
+  "$defs": {
+    "WorkItemStatus": {
+      "enum": [
+        "pending",
+        "running",
+        "completed",
+        "completed_with_gaps",
+        "needs_input",
+        "blocked",
+        "failed",
+        "skipped"
+      ],
+      "title": "WorkItemStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Durable CAS-updated pointer to the committed result of one work item.\n\nThe head is authoritative: the working result.json is only a mirror of\nthe immutable attempt snapshot it references, so recovery never guesses\nbusiness state from Trace events. Replaying the same committed attempt is\nan idempotent no-op.",
+  "properties": {
+    "contract_version": {
+      "const": "3.0.0",
+      "default": "3.0.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "head_id": {
+      "pattern": "^head-[a-f0-9]{12}$",
+      "title": "Head Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "work_item_id": {
+      "title": "Work Item Id",
+      "type": "string"
+    },
+    "attempt_id": {
+      "pattern": "^attempt-[a-f0-9]{24}$",
+      "title": "Attempt Id",
+      "type": "string"
+    },
+    "result_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Result Digest",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/WorkItemStatus"
+    },
+    "version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "supersedes_head_id": {
+      "anyOf": [
+        {
+          "pattern": "^head-[a-f0-9]{12}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes Head Id"
+    },
+    "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project_id",
+    "work_item_id",
+    "attempt_id",
+    "result_digest",
+    "status"
+  ],
+  "title": "WorkItemHead",
+  "type": "object"
+}

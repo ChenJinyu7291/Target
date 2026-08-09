@@ -293,6 +293,19 @@
       "title": "Cached",
       "type": "boolean"
     },
+    "supersedes_tool_run_id": {
+      "anyOf": [
+        {
+          "pattern": "^tool-[a-f0-9]{12}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes Tool Run Id"
+    },
     "started_at": {
       "title": "Started At",
       "type": "string"

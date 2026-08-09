@@ -190,6 +190,8 @@ class ColocResultColumnMap(ContractModel):
     pp3: str
     pp4: str
     n_variants: str
+    gwas_effect_allele_frequency: str | None = None
+    eqtl_effect_allele_frequency: str | None = None
     variant_id: str | None = None
 
 
@@ -203,6 +205,8 @@ class HarmonizedVariantColumnMap(ContractModel):
     gwas_other_allele: str
     eqtl_effect_allele: str
     eqtl_other_allele: str
+    gwas_effect_allele_frequency: str | None = None
+    eqtl_effect_allele_frequency: str | None = None
     variant_id: str | None = None
 
 

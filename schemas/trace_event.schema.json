@@ -31,7 +31,10 @@
         "ranking",
         "report",
         "degradation",
-        "refusal"
+        "refusal",
+        "evidence_superseded",
+        "planner_pattern_hints",
+        "planner_paper_evidence"
       ],
       "title": "Event Type",
       "type": "string"

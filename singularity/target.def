@@ -10,10 +10,10 @@ From: docker.1panel.live/library/python:3.11-slim
 %environment
     export PYTHONUNBUFFERED=1
     export PYTHONDONTWRITEBYTECODE=1
-    export RESEARCH_AGENT_PROJECT_DIR=/opt/target/projects
-    export TARGET_AGENT_RUN_DIR=/opt/target/runs
-    export TARGET_AGENT_CACHE_DIR=/opt/target/cache
-    export TARGET_AGENT_INPUT_ROOT=/opt/target/data/input
+    export RESEARCH_AGENT_PROJECT_DIR=/data/projects
+    export TARGET_AGENT_RUN_DIR=/data/runs
+    export TARGET_AGENT_CACHE_DIR=/data/cache
+    export TARGET_AGENT_INPUT_ROOT=/data/input
 
 %files
     pyproject.toml /opt/target/pyproject.toml
@@ -28,7 +28,7 @@ From: docker.1panel.live/library/python:3.11-slim
     apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
     pip install --upgrade pip
     pip install "/opt/target[mcp]"
-    mkdir -p /opt/target/projects /opt/target/runs /opt/target/cache /opt/target/data/input
+    mkdir -p /data/projects /data/runs /data/cache /data/input
 
 %runscript
     exec target-agent "$@"

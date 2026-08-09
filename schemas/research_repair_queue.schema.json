@@ -77,6 +77,11 @@
     "RepairAction": {
       "enum": [
         "rerun_subgraph_same_inputs",
+        "switch_dataset_same_context",
+        "supplement_evidence",
+        "exclude_evidence",
+        "split_context_same_scope",
+        "downgrade_claim",
         "request_input",
         "retain_gap",
         "stop"
@@ -172,6 +177,34 @@
           "default": "1.0.0",
           "title": "Policy Version",
           "type": "string"
+        },
+        "directive_id": {
+          "anyOf": [
+            {
+              "pattern": "^directive-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Directive Id"
+        },
+        "directive_payload": {
+          "additionalProperties": true,
+          "title": "Directive Payload",
+          "type": "object"
+        },
+        "no_scope_change": {
+          "default": true,
+          "title": "No Scope Change",
+          "type": "boolean"
+        },
+        "candidate_lane_recompute_required": {
+          "default": false,
+          "title": "Candidate Lane Recompute Required",
+          "type": "boolean"
         },
         "success_criteria": {
           "items": {
@@ -345,21 +378,68 @@
           "title": "Parent Revision Id"
         },
         "revision_number": {
-          "maximum": 2,
+          "maximum": 30,
           "minimum": 1,
           "title": "Revision Number",
           "type": "integer"
         },
         "repair_request_id": {
-          "pattern": "^repair-[a-f0-9]{24}$",
-          "title": "Repair Request Id",
-          "type": "string"
+          "anyOf": [
+            {
+              "pattern": "^repair-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repair Request Id"
+        },
+        "fork_branch_id": {
+          "anyOf": [
+            {
+              "pattern": "^branch-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fork Branch Id"
         },
         "operation": {
-          "const": "rerun_subgraph_same_inputs",
           "default": "rerun_subgraph_same_inputs",
+          "enum": [
+            "rerun_subgraph_same_inputs",
+            "switch_dataset_same_context",
+            "supplement_evidence",
+            "exclude_evidence",
+            "downgrade_claim",
+            "split_context_same_scope",
+            "fork_rollback"
+          ],
           "title": "Operation",
           "type": "string"
+        },
+        "directive_id": {
+          "anyOf": [
+            {
+              "pattern": "^directive-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Directive Id"
+        },
+        "payload": {
+          "additionalProperties": true,
+          "title": "Payload",
+          "type": "object"
         },
         "added_items": {
           "items": {
@@ -408,7 +488,6 @@
         "project_id",
         "base_plan_id",
         "revision_number",
-        "repair_request_id",
         "added_items",
         "superseded_item_ids",
         "trigger_snapshot_digest",
@@ -530,6 +609,19 @@
           ],
           "default": null,
           "title": "Repair Request Id"
+        },
+        "fork_branch_id": {
+          "anyOf": [
+            {
+              "pattern": "^branch-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fork Branch Id"
         }
       },
       "required": [

@@ -63,6 +63,30 @@
           },
           "title": "Degradation Conditions",
           "type": "array"
+        },
+        "candidate_bound": {
+          "default": false,
+          "title": "Candidate Bound",
+          "type": "boolean"
+        },
+        "evidence_lane": {
+          "anyOf": [
+            {
+              "enum": [
+                "literature",
+                "genetics",
+                "drug_safety",
+                "perturbation",
+                "trials"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Lane"
         }
       },
       "required": [

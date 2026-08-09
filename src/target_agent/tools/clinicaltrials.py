@@ -33,6 +33,23 @@ def _phase_label(phases: list[str] | None) -> str:
     return {0: "Early Phase 1", 1: "Phase 1", 2: "Phase 2", 3: "Phase 3", 4: "Phase 4"}.get(best, "phase not specified")
 
 
+def _utc_now() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _payload_digest(payload: dict[str, Any]) -> str:
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def _read_clinical_trials_cache(path: Path) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(raw, dict) and raw.get("schema") == "clinical_trials_snapshot_v1" and isinstance(raw.get("payload"), dict):
+        return raw["payload"], {
+            "retrieved_at": raw.get("retrieved_at"), "response_digest": raw.get("response_digest"),
+        }
+    return raw, None
+
+
 class ClinicalTrialsGovTool(ScientificTool):
     name = "clinical_trials_gov"
     version = "1.0.0"
@@ -48,11 +65,12 @@ class ClinicalTrialsGovTool(ScientificTool):
         self.max_genes = max_genes
         self.page_size = page_size
 
-    def _fetch(self, disease: str, gene: str, cache_path: Path, cache_only: bool) -> tuple[dict[str, Any], bool]:
+    def _fetch(self, disease: str, gene: str, cache_path: Path, cache_only: bool) -> tuple[dict[str, Any], bool, dict[str, Any] | None]:
         if cache_only:
             if not cache_path.exists():
                 raise FileNotFoundError("ClinicalTrials.gov cache is missing in cache-only mode")
-            return json.loads(cache_path.read_text(encoding="utf-8")), True
+            payload, meta = _read_clinical_trials_cache(cache_path)
+            return payload, True, meta
         try:
             response = self.session.get(
                 STUDIES_URL,
@@ -63,11 +81,18 @@ class ClinicalTrialsGovTool(ScientificTool):
             response.raise_for_status()
             payload = response.json()
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-            return payload, False
+            snapshot = {
+                "schema": "clinical_trials_snapshot_v1", "retrieved_at": _utc_now(),
+                "response_digest": _payload_digest(payload), "payload": payload,
+            }
+            cache_path.write_text(json.dumps(snapshot, ensure_ascii=False), encoding="utf-8")
+            return payload, False, {
+                "retrieved_at": snapshot["retrieved_at"], "response_digest": snapshot["response_digest"],
+            }
         except (requests.RequestException, ValueError):
             if cache_path.exists():
-                return json.loads(cache_path.read_text(encoding="utf-8")), True
+                payload, meta = _read_clinical_trials_cache(cache_path)
+                return payload, True, meta
             raise
 
     @staticmethod
@@ -95,7 +120,7 @@ class ClinicalTrialsGovTool(ScientificTool):
             for gene in genes:
                 cache_key = hashlib.sha256(f"{disease}|{gene}".encode()).hexdigest()[:16]
                 cache_path = context.cache_dir / "clinical_trials" / f"{cache_key}.json"
-                payload, cached = self._fetch(disease, gene, cache_path, context.settings.cache_only)
+                payload, cached, snapshot_meta = self._fetch(disease, gene, cache_path, context.settings.cache_only)
                 cached_any = cached_any or cached
                 queried += 1
                 for study in payload.get("studies", []):
@@ -136,6 +161,8 @@ class ClinicalTrialsGovTool(ScientificTool):
                             version_meta={
                                 "data_version": "ClinicalTrials.gov:live-or-cache",
                                 "cached": cached_any,
+                                "retrieved_at": (snapshot_meta or {}).get("retrieved_at"),
+                                "response_digest": (snapshot_meta or {}).get("response_digest"),
                                 "last_update_submit_date": status_mod.get("lastUpdateSubmitDate", ""),
                             },
                         ),
@@ -178,12 +205,16 @@ class ClinicalTrialsGovTool(ScientificTool):
                          "matched_assay": ["clinical trial registry"],
                          "source_fields": ["registry_record"],
                      },
-                     "context_score_origin": "tool_estimate"},
+                     "context_score_origin": "tool_estimate",
+                     "snapshot_meta": snapshot_meta or {}},
             capability=capability, data_version="ClinicalTrials.gov:live-or-cache", code_version="1.0.0",
             parameters={"api": "v2", "page_size": self.page_size},
             artifacts=[], evidence_ids=[item.evidence_id for item in evidence],
             warnings=[] if evidence else ["no_gene_named_trial_claims"],
-            limitations=["Intervention-target mapping is name-based and conservative; efficacy requires trial results, not registry records."],
+            limitations=[
+                "Intervention-target mapping is name-based and conservative; efficacy requires trial results, not registry records.",
+                "ClinicalTrials.gov is queried live when no cache exists, so records can drift between runs; retrieval timestamp and response digest are recorded for audit.",
+            ],
             cached=cached_any, elapsed_ms=int((time.perf_counter() - started) * 1000),
         )
         return ToolExecution(result=result, evidence=evidence)

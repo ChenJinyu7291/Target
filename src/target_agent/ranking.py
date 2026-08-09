@@ -234,6 +234,23 @@ def rank_targets(
                 "Terminal status is not COMPLETED; unconditional GO is globally forbidden while unresolved gaps remain."
             )
             gaps.append("Terminal status carries unresolved gaps; resolve findings before an unconditional GO.")
+        strong_opposing = any(
+            item.stance == Stance.REFUTES
+            and item.claim_class in {ClaimClass.FACT, ClaimClass.OBSERVED}
+            and item.effect_direction != "unclear"
+            for item in items
+        )
+        if strong_opposing:
+            blockers.append(
+                "Strong opposing evidence (FACT/OBSERVED, directional) is retained; "
+                "NO_GO unless context-specific review resolves it."
+            )
+            gaps.append("Resolve strong opposing evidence before any conditional investment.")
+        if safety_events:
+            blockers.append(
+                "Known safety liabilities are retained; NO_GO unless a context-specific "
+                "risk assessment overrides them."
+            )
 
         scores = ScoreBreakdown(
             human_genetics=_clamp(genetics, 25), disease_omics=_clamp(omics, 20),
@@ -243,7 +260,9 @@ def rank_targets(
         )
         independent = sum([has_strict_genetics, has_omics, has_observed_perturb, has_literature, bool(matched_drugs)])
         gate = has_strict_genetics or has_observed_perturb
-        if blockers:
+        if safety_events or strong_opposing:
+            decision = "NO_GO"
+        elif blockers:
             decision = "CONDITIONAL_GO" if independent >= 2 else "INSUFFICIENT_EVIDENCE"
         elif independent >= 2 and gate:
             decision = "GO"

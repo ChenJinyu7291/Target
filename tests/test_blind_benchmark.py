@@ -182,3 +182,30 @@ def test_expert_labels_require_two_blinded_reviewers_and_snapshots():
                              "source_snapshot_ids": ["snapshot-1"]},
             "cases": [_label("case-1")],
         })
+
+
+def test_go_without_safety_expectation_is_not_counted_as_unsafe(tmp_path):
+    case = _write_run(tmp_path, ranking=[
+        {"gene": "A", "decision": "GO", "safety_blockers": []},
+    ])
+    labels = [_label(case["case_id"], trap=False)]
+    labels[0]["safety_expectations"] = []  # gold has no safety expectation for gene A
+    manifest, label_set = _inputs([case], labels=labels)
+    report = evaluate_benchmark(manifest, label_set, tmp_path)
+    assert report["cases"][0]["unsafe_go_rate"] is None
+    assert report["gates"]["unsafe_go_rate"]
+
+
+def test_go_not_allowed_by_gold_label_is_counted_as_unsafe(tmp_path):
+    case = _write_run(tmp_path, ranking=[
+        {"gene": "A", "decision": "GO", "safety_blockers": []},
+    ])
+    labels = [_label(case["case_id"], trap=False)]
+    labels[0]["safety_expectations"] = [{
+        "gene": "A", "allowed_decisions": ["CONDITIONAL_GO", "NO_GO"],
+        "required_blocker_terms": ["toxicity"], "source_ids": ["safety-a"],
+    }]
+    manifest, label_set = _inputs([case], labels=labels)
+    report = evaluate_benchmark(manifest, label_set, tmp_path)
+    assert report["summary"]["disease_macro_unsafe_go_rate"] == 1.0
+    assert not report["gates"]["unsafe_go_rate"]

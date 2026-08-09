@@ -280,6 +280,14 @@ def check_assertion(assertion: dict, ctx: dict) -> str | None:
         bad = [e["evidence_id"] for e in evidence
                if not e.get("source_span") or not e.get("source", {}).get("uri")]
         return None if not bad else f"evidence without provenance: {bad[:3]}"
+    if kind == "min_reference_genes_in_evidence":
+        evidence = ctx["evidence_items"]
+        genes = {str(e.get("gene_symbol") or "").strip().upper() for e in evidence if e.get("gene_symbol")}
+        reference = {str(g).strip().upper() for g in assertion.get("reference_genes", [])}
+        min_count = int(assertion.get("min_count", 1))
+        hit = len(genes & reference)
+        return None if hit >= min_count else \
+            f"reference-gene coverage {hit} < {min_count}: {sorted(genes & reference)[:5]}"
     if kind == "deterministic":
         baseline = ctx["observable"]
         for index in range(assertion.get("runs", 2) - 1):
@@ -317,7 +325,13 @@ def check_assertion(assertion: dict, ctx: dict) -> str | None:
         claims = jsonl(run_dir / "claims.jsonl")
         bad = [c.get("claim_id") for c in claims
                if c.get("claim_class") in {"FACT", "OBSERVED"} and causal.search(c.get("statement", ""))]
-        return None if not bad else f"causal FACT/OBSERVED claims emitted: {bad[:3]}"
+        evidence = jsonl(run_dir / "evidence_items.jsonl")
+        bad.extend(
+            e.get("evidence_id") for e in evidence
+            if e.get("claim_class") in {"FACT", "OBSERVED"}
+            and causal.search(str(e.get("statement") or ""))
+        )
+        return None if not bad else f"causal FACT/OBSERVED claims or evidence emitted: {bad[:3]}"
     if kind == "finding_message_contains":
         findings = jsonl(run_dir / "reviewer_findings.jsonl")
         needle = assertion["substring"].casefold()

@@ -1,0 +1,96 @@
+{
+  "additionalProperties": false,
+  "description": "Durable CAS-updated pointer to the active version of one logical artifact.\n\nVersion rows in artifact_versions.jsonl remain immutable and auditable;\nthis head only states which version is current for consumers such as the\nReviewer, so old versions are never lost.",
+  "properties": {
+    "contract_version": {
+      "const": "3.0.0",
+      "default": "3.0.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "artifact_id": {
+      "pattern": "^artifact-[a-f0-9]{24}$",
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "work_item_id": {
+      "title": "Work Item Id",
+      "type": "string"
+    },
+    "logical_name": {
+      "minLength": 1,
+      "title": "Logical Name",
+      "type": "string"
+    },
+    "version_id": {
+      "pattern": "^artifact-version-[a-f0-9]{24}$",
+      "title": "Version Id",
+      "type": "string"
+    },
+    "record_id": {
+      "pattern": "^artifact-[a-f0-9]{12,24}$",
+      "title": "Record Id",
+      "type": "string"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    },
+    "size_bytes": {
+      "minimum": 0,
+      "title": "Size Bytes",
+      "type": "integer"
+    },
+    "media_type": {
+      "default": "application/octet-stream",
+      "title": "Media Type",
+      "type": "string"
+    },
+    "uri": {
+      "pattern": "^project://",
+      "title": "Uri",
+      "type": "string"
+    },
+    "updated_by_attempt_id": {
+      "anyOf": [
+        {
+          "pattern": "^attempt-[a-f0-9]{24}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Updated By Attempt Id"
+    },
+    "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "artifact_id",
+    "project_id",
+    "work_item_id",
+    "logical_name",
+    "version_id",
+    "record_id",
+    "version",
+    "sha256",
+    "size_bytes",
+    "uri"
+  ],
+  "title": "ArtifactHead",
+  "type": "object"
+}

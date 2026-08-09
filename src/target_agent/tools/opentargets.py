@@ -42,6 +42,31 @@ query ResolveDisease($queryString: String!) {
 """
 
 
+def _utc_now() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _payload_digest(payload: dict[str, Any]) -> str:
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def _read_open_targets_cache(path: Path) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(raw, dict) and raw.get("schema") == "open_targets_snapshot_v1" and isinstance(raw.get("payload"), dict):
+        return raw["payload"], {
+            "retrieved_at": raw.get("retrieved_at"), "response_digest": raw.get("response_digest"),
+        }
+    return raw, None
+
+
+def _snapshot_meta(meta: dict[str, Any] | None, cached: bool) -> dict[str, Any]:
+    merged: dict[str, Any] = {"data_version": "OpenTargets:live-or-cache", "cached": cached}
+    if meta and meta.get("retrieved_at"):
+        merged["retrieved_at"] = meta["retrieved_at"]
+    if meta and meta.get("response_digest"):
+        merged["response_digest"] = meta["response_digest"]
+    return merged
+
 class OpenTargetsTool(ScientificTool):
     name = "open_targets"
     version = "2.2.0"
@@ -94,11 +119,12 @@ class OpenTargetsTool(ScientificTool):
     def _retrieve(
         self, disease_id: str | None, disease_name: str, candidate_genes: list[str],
         cache_path: Path, cache_only: bool = False,
-    ) -> tuple[dict[str, Any], bool]:
+    ) -> tuple[dict[str, Any], bool, dict[str, Any] | None]:
         if cache_only:
             if not cache_path.exists():
                 raise FileNotFoundError("Open Targets cache is missing in cache-only mode")
-            return json.loads(cache_path.read_text(encoding="utf-8")), True
+            payload, meta = _read_open_targets_cache(cache_path)
+            return payload, True, meta
         try:
             resolved_id, payload = self._resolve_disease(disease_id, disease_name)
             disease = payload["data"]["disease"]
@@ -130,11 +156,18 @@ class OpenTargetsTool(ScientificTool):
             payload["selected_genetic_symbols"] = sorted(symbol for symbol in selected_symbols if symbol)
             payload["clinical_warning"] = clinical_warning
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-            return payload, False
+            snapshot = {
+                "schema": "open_targets_snapshot_v1", "retrieved_at": _utc_now(),
+                "response_digest": _payload_digest(payload), "payload": payload,
+            }
+            cache_path.write_text(json.dumps(snapshot, ensure_ascii=False), encoding="utf-8")
+            return payload, False, {
+                "retrieved_at": snapshot["retrieved_at"], "response_digest": snapshot["response_digest"],
+            }
         except (requests.RequestException, ValueError):
             if cache_path.exists():
-                return json.loads(cache_path.read_text(encoding="utf-8")), True
+                payload, meta = _read_open_targets_cache(cache_path)
+                return payload, True, meta
             raise
 
     def _retrieve_clinical_candidates(self, target_ids: list[str]) -> dict[str, Any]:
@@ -169,7 +202,7 @@ class OpenTargetsTool(ScientificTool):
         }, sort_keys=True).encode()).hexdigest()[:20]
         cache_path = context.cache_dir / "open_targets" / f"{cache_key}.json"
         try:
-            payload, cached = self._retrieve(
+            payload, cached, snapshot_meta = self._retrieve(
                 disease_id, disease_name,
                 context.candidate_genes, cache_path, context.settings.cache_only,
             )
@@ -182,6 +215,7 @@ class OpenTargetsTool(ScientificTool):
                 limitations=["Genetic, druggability and known-drug dimensions remain missing until the API/cache is available."],
                 elapsed_ms=int((time.perf_counter() - started) * 1000),
             ), evidence=[])
+        snapshot_meta = snapshot_meta or {}
         disease = payload["data"]["disease"]
         resolved_disease_id = payload.get("resolved_disease_id", disease["id"])
         candidate_set = set(context.candidate_genes) | set(payload.get("selected_genetic_symbols", []))
@@ -238,7 +272,7 @@ class OpenTargetsTool(ScientificTool):
                 evidence.append(EvidenceItem(
                     tool_run_id=run_id, gene_symbol=gene, claim_class=ClaimClass.INFERRED,
                     statement=f"Open Targets reports a human-genetic association score of {genetic_association:.3g} for {gene} and {disease['name']}.",
-                    source=SourceLocator(uri=f"https://platform.opentargets.org/disease/{resolved_disease_id}/associations", source_id=resolved_disease_id, version="live-or-cache", section="associatedTargets", chunk_id=f"ot-genetics-{gene}", version_meta={"data_version": "OpenTargets:live-or-cache", "cached": cached, "section": "associatedTargets"}),
+                    source=SourceLocator(uri=f"https://platform.opentargets.org/disease/{resolved_disease_id}/associations", source_id=resolved_disease_id, version="live-or-cache", section="associatedTargets", chunk_id=f"ot-genetics-{gene}", version_meta={**_snapshot_meta(snapshot_meta, cached), "section": "associatedTargets"}),
                     source_span=span,
                     context=EvidenceContext(organism="Homo sapiens", disease=disease["name"], assay="Open Targets evidence aggregation"),
                     stance=Stance.SUPPORTS,
@@ -276,7 +310,7 @@ class OpenTargetsTool(ScientificTool):
                         uri=f"https://platform.opentargets.org/disease/{resolved_disease_id}/associations",
                         source_id=resolved_disease_id, version="live-or-cache",
                         section="associatedTargets", chunk_id=f"ot-somatic-{gene}",
-                        version_meta={"data_version": "OpenTargets:live-or-cache", "cached": cached, "section": "associatedTargets"},
+                        version_meta={**_snapshot_meta(snapshot_meta, cached), "section": "associatedTargets"},
                     ),
                     source_span=(
                         f"disease={resolved_disease_id}|target={target.get('id')}|"
@@ -305,7 +339,7 @@ class OpenTargetsTool(ScientificTool):
                 evidence.append(EvidenceItem(
                     tool_run_id=run_id, gene_symbol=gene, claim_class=ClaimClass.INFERRED,
                     statement=f"Open Targets links {drug.get('prefName')} ({drug.get('drugId')}) to {gene}; reported clinical stage {drug.get('phase')}.",
-                    source=SourceLocator(uri=f"https://platform.opentargets.org/target/{target.get('id')}", source_id=str(drug.get("drugId")), version="live-or-cache", section="knownDrugs", chunk_id=f"ot-drug-{gene}-{drug.get('drugId')}", version_meta={"data_version": "OpenTargets:live-or-cache", "cached": cached, "section": "knownDrugs"}),
+                    source=SourceLocator(uri=f"https://platform.opentargets.org/target/{target.get('id')}", source_id=str(drug.get("drugId")), version="live-or-cache", section="knownDrugs", chunk_id=f"ot-drug-{gene}-{drug.get('drugId')}", version_meta={**_snapshot_meta(snapshot_meta, cached), "section": "knownDrugs"}),
                     source_span=span,
                     context=EvidenceContext(organism="Homo sapiens", disease=disease["name"], assay="Open Targets known drugs"),
                     stance=Stance.SUPPORTS, effect={"drug": drug},
@@ -331,7 +365,7 @@ class OpenTargetsTool(ScientificTool):
                         uri=liability.get("url") or f"https://platform.opentargets.org/target/{target.get('id')}",
                         source_id=str(liability.get("eventId") or target.get("id")), version="live-or-cache",
                         section="safetyLiabilities", chunk_id=f"ot-safety-{gene}-{liability.get('eventId') or 'event'}",
-                        version_meta={"data_version": "OpenTargets:live-or-cache", "cached": cached, "section": "safetyLiabilities"},
+                        version_meta={**_snapshot_meta(snapshot_meta, cached), "section": "safetyLiabilities"},
                     ),
                     source_span=span,
                     context=EvidenceContext(organism="Homo sapiens", disease=disease["name"], assay="Open Targets safety liability"),
@@ -373,7 +407,8 @@ class OpenTargetsTool(ScientificTool):
                          "matched_cell": [], "matched_assay": ["Open Targets evidence aggregation"],
                          "source_fields": ["associatedTargets", "knownDrugs", "safetyLiabilities"],
                      },
-                     "context_score_origin": "tool_estimate"
+                     "context_score_origin": "tool_estimate",
+                     "snapshot_meta": snapshot_meta
                      },
             candidate_genes=[
                 row["gene"] for row in sorted(
@@ -388,6 +423,7 @@ class OpenTargetsTool(ScientificTool):
             limitations=[
                 "Only the first 100 disease associations and selected candidate target profiles are retrieved for the MVP.",
                 "Open Targets coverage is aggregate multi-evidence coverage, never locus-level genetics coverage.",
+                "Open Targets is queried live when no cache exists, so results can drift between runs; retrieval timestamp and response digest are recorded for audit.",
             ],
             cached=cached, elapsed_ms=int((time.perf_counter() - started) * 1000),
         )

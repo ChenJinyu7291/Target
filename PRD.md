@@ -1,6 +1,6 @@
 # Target 产品化后续 PRD
 
-> 文档状态：下一阶段输入；当前实现完成后暂停继续开发。  
+> 文档状态：下一阶段输入；当前基线（V2.2 科学主链 + V3 项目控制面）已于 2026-08-09 通过远程验收（492 passed / 2 skipped；benchmark 13 tasks / 29 assertions / score 1.0）。后续开发按团队决定执行。  
 > 产品对象：面向疾病靶点发现的可追溯生命科学科研 Agent，而非通用聊天助手、独立评测平台或湿实验自动化系统。
 
 ## 1. 产品目标
@@ -45,7 +45,7 @@ Target 要把一个疾病靶点问题从“提出”推进到“可审查的研�
 
 ## 4. 已有基线
 
-当前仓库已经具备：动态公开组学发现与受控分析、受限遗传学输入审查、多证据融合、TargetCard 与实验计划、Evidence Store/Trace、确定性 Reviewer、项目级持久化控制面、HTTP/stdio MCP，以及第一种项目级修复：对经项目执行/完整性评审确认的 transient、side-effect-free、replay-safe 模块执行相同输入的有界子图重跑，并重新评审和生成绑定新快照的 release decision marker。领域科学 finding 尚不能直接触发自动补证。
+当前仓库已经具备：动态公开组学发现与受控分析、受限遗传学输入审查、多证据融合、TargetCard 与实验计划、Evidence Store/Trace、确定性 Reviewer、项目级持久化控制面、HTTP/stdio MCP，以及第一种项目级修复：对经项目执行/完整性评审确认的 transient、side-effect-free、replay-safe 模块执行相同输入的有界子图重跑，并重新评审和生成绑定新快照的 release decision marker。类型化领域 finding 已能触发受政策约束的自动补证：R0 派生层修正与 R1 同范围补证自动执行，R2 证据排除需 checkpoint，R3 问题/真值/阈值变更禁止自动；LangGraph 与 legacy 双引擎已实现 parity，论文模式 few-shot 与摘要 RAG 已接入两端 Planner，对齐数据资产（120 SFT / 60 preference / 30 held-out）与 Reviewer LoRA 管线已就绪（训练延后）。
 
 详见 [COMPLETED.md](COMPLETED.md)。这一基线不等于已形成开放世界产品：外部盲测、跨疾病专家数据、通用科学修复、并发多用户服务和生产级权限仍未完成。
 
@@ -75,7 +75,9 @@ Target 的差异化不是复制通用工作台，而是在这些控制面原则�
 
 ## 6. 后续需求与优先级
 
-### P0：把当前可靠性闭环做完整
+### P0：把当前可靠性闭环做完整（已完成，2026-08-09 验收）
+
+> 状态：P0.1–P0.4 已实现并通过 2026-08-09 全量 pytest（492 passed / 2 skipped）与 benchmark（13/13 tasks、29/29 assertions）；以下条目保留为设计与验收记录，详见 [COMPLETED.md](COMPLETED.md)。
 
 #### P0.1 工作尝试与不可变产物版本
 
@@ -182,12 +184,12 @@ recipe -> omics analysis -> enrichment -> candidate extraction
 - 以内部 benchmark 满分宣称生物学发现准确率；
 - 在没有独立验证的情况下自动控制湿实验。
 
-## 9. 下一次恢复工作的建议顺序
+## 9. 建议顺序与状态
 
-1. 冻结 attempt/head/artifact-version 合同；
-2. 实现同上下文数据集替换及依赖失效；
-3. 把领域 finding 转换为类型化 repair directive；
-4. 建立状态迁移 benchmark；
-5. 再推进 Alignment 数据、盲测与专家 release。
+1. 冻结 attempt/head/artifact-version 合同 —— 已完成（P0.1）；
+2. 实现同上下文数据集替换及依赖失效 —— 已完成（P0.3）；
+3. 把领域 finding 转换为类型化 repair directive —— 已完成（P0.2）；
+4. 建立状态迁移 benchmark —— 已完成（P0.4，BM-01~BM-13 与错误注入回归）；
+5. 下一步优先级：P1.2 Alignment 数据闭环（团队决定延后）→ P1.3 外部盲测靶点排名 → P1.4 专家 release gate → P2 产品交付（认证、多租户、任务取消、可观测性）。
 
-本 PRD 是暂停点后的开发输入，不代表其中路线已实现或已承诺发布日期。
+本 PRD 是当前基线之后的开发输入，不代表其中路线已实现或已承诺发布日期。

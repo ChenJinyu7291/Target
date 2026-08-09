@@ -2,6 +2,28 @@
 
 Cross-module contracts, workflow choices, model boundaries and scientific-safety decisions are recorded here. Accepted decisions must not be changed silently in a feature branch.
 
+## 2026-08-09 - Round-2 全项目审计修复与 Round-3 产品收口
+
+- **Status:** accepted
+- Round-2 四份审计（产品/科学/架构/安全）及修复清单见 `../review/`；修复已随 `2c4bc76` 合入 main：CLI fork/branch/session 子命令、Web 错误 detail 展示/创建防抖与二次确认/审批角色接线/合同能力条、文档一致性、首个 GitHub Actions CI 门禁、benchmark 13/29 刷新。
+- 修复闭环实质复查按 finding 实际类别执行，纯 coverage-gap 补充不再被 missing-provenance 原始质症检查误拦截；restore fork 的 head-backed 恢复 attempt 记入活动 fork 点（基础项单条历史 attempt、活动 fork 点两条）。
+- Streamable HTTP MCP 状态统一为：基础 transport 已完成（本地/可信网络绑定）；认证、多租户与生产级发布未完成。
+- 对齐数据生成与 Planner/Reviewer 小模型训练（P3）继续延后，先以 RAG + few-shot + 确定性规则验证策略价值。
+- Round-3 产品收口：Dockerfile 与 Singularity 默认数据目录与 `/data` 卷对齐（裸 `docker run -v target-data:/data` / `--bind ...:/data` 持久化生效）；README benchmark 表述明确 13 非 live + 3 live 及报告范围；Web fork 发起与会话消息 actor 从会话角色派生；PRD 标记 P0 已完成并明确下一阶段优先级；product_status.html 修正重复条目并刷新时间戳。
+- 未决：长任务取消/暂停（P2-2）需要 runtime 协作取消与 Web/MCP/CLI 接口，本轮不实现，作为下一轮架构+产品联合项。
+
+## 2026-08-10 - Round-3 科学线与质量线收口
+
+- **Status:** accepted
+- 遗传学车道：非回文 EAF 一致性校验（swapped 用 1-EAF 互补，阈值 0.15），context 匹配输出 matched_terms/match_rules 明细，coloc/harmonized 列映射支持可选 EAF。
+- 决策语义：强反对 FACT/OBSERVED 方向性证据与已知安全阻断不再被总分隐藏，直接 NO_GO；Reviewer 因果语言扫描扩展到 uncertainty/effect，并扩充中英文因果词表。
+- 修复控制面：子上下文拆分必须锚定证据自身上下文；数据集替换按 context match/元数据置信度/独立样本量择优。
+- 外部快照可审计：Open Targets 与 ClinicalTrials 缓存信封化（retrieved_at + response_digest），证据 version_meta 记录时间戳/摘要。
+- 组学护栏：疑似原始整数计数拒绝进入固定 limma，归一化不可自证时标记 normalization_unverified；GEO 元数据审查增加 barcode 识别、单元覆盖率与疾病同义词命中检查。
+- 质量门：CI 收集必红修复（pandas 等可选依赖函数内懒加载）；新增 60 个测试覆盖候选门禁、resume 共享校验、NO_GO、快照元数据等；schema 重导出 54 个生成 + 1 个手写基准。
+- 远程验收：pytest 559 collected / 557 passed / 2 skipped；benchmark 13/29 score 1.0；repo_policy_check OK。
+- 未决不变：外部独立 scorer/专家盲测标签、认证与多租户、长任务取消/暂停（P2-2）留待下一轮。
+
 ## 2026-08-08 - PR 12 合并与产品发布路径收口
 
 - **Status:** accepted

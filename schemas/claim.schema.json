@@ -5,6 +5,7 @@
         "FACT",
         "OBSERVED",
         "PREDICTED",
+        "UNVERIFIED",
         "INFERRED"
       ],
       "title": "ClaimClass",

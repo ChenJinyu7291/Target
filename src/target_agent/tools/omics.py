@@ -285,7 +285,7 @@ class GEOSearchTool(ScientificTool):
     @staticmethod
     def _score(row: dict[str, Any], disease_terms: list[str], tissue: str | None, assay: str | None) -> float:
         text = " ".join(str(row.get(key) or "") for key in ("title", "summary", "gdstype", "taxon")).casefold()
-        disease = 1.0 if any(term.casefold() in text for term in disease_terms if len(term) > 2) else 0.35
+        disease = 1.0 if any(term.casefold() in text for term in disease_terms if len(term) > 2) else 0.0
         tissue_score = 1.0 if tissue and tissue.casefold() in text else (0.5 if not tissue else 0.0)
         assay_score = 1.0 if assay and assay.casefold() in text else (0.7 if "expression profiling" in text else 0.3)
         design = 1.0 if any(token in text for token in ("control", "case", "tumor", "normal", "disease")) else 0.5
@@ -523,16 +523,18 @@ class GEOMetadataAuditTool(ScientificTool):
     def _biological_units(samples: list[dict[str, str]], mapping: dict[str, str]) -> dict[str, str]:
         units: dict[str, str] = {}
         label_pattern = re.compile(
-            r"(?:donor|patient|subject|individual|sample|rep(?:licate)?)\s*[:#_-]?\s*([a-z0-9]+)",
+            r"(?:donor|patient|subject|individual|sample|rep(?:licate)?|case|control|disease|normal|tumor|ctrl|healthy|wildtype|wt|knockout|ko)\s*[:#_-]?\s*([a-z0-9]+)",
             flags=re.I,
         )
+        barcode_pattern = re.compile(r"\b(?:TCGA|TARGET|GTEX|GDC)-[A-Z0-9]{2,4}-[A-Z0-9]{4}\b", flags=re.I)
         for sample in samples:
             text = " | ".join((sample["title"], sample["source"], sample["characteristics"]))
-            match = label_pattern.search(text)
+            match = label_pattern.search(text) or barcode_pattern.search(text)
             if match:
                 source = _safe_token(sample["source"].casefold()) or "sample"
                 group = mapping.get(sample["sample_id"], "unclassified")
-                units[sample["sample_id"]] = f"{group}:{source}:{match.group(1).casefold()}"
+                unit_id = match.group(1).casefold() if match.lastindex else match.group(0).casefold()
+                units[sample["sample_id"]] = f"{group}:{source}:{unit_id}"
             else:
                 units[sample["sample_id"]] = sample["sample_id"]
         return units
@@ -586,6 +588,17 @@ class GEOMetadataAuditTool(ScientificTool):
         for raw in raw_candidates:
             candidate = DatasetCandidate.model_validate(raw)
             matrix_url, suppl_url = _geo_paths(candidate.accession)
+            disease_terms = [disease]
+            if resolver is not None:
+                disease_terms.extend(resolver.outputs.get("search_synonyms") or [])
+            disease_hit = any(
+                len(str(term).strip()) > 2
+                and (
+                    _normal(str(term)) in _normal(candidate.disease or "")
+                    or _normal(str(term)) in _normal(candidate.title or "")
+                )
+                for term in disease_terms
+            )
             audit_cache_key = hashlib.sha256(json.dumps({
                 "contract_version": CONTRACT_VERSION,
                 "tool_version": self.version,
@@ -596,6 +609,7 @@ class GEOMetadataAuditTool(ScientificTool):
                 "minimum": minimum,
                 "confidence_gate": confidence_gate,
                 "metadata_model": context.settings.step_model if self.llm else "deterministic",
+                "unit_parser": "v2",
             }, sort_keys=True).encode("utf-8")).hexdigest()
             audit_cache_path = context.cache_dir / "geo" / "metadata_audit" / f"{audit_cache_key}.json"
             if audit_cache_path.is_file():
@@ -640,6 +654,11 @@ class GEOMetadataAuditTool(ScientificTool):
                     mapping, confidence = self._deterministic_groups(samples, disease)
                 mapping = {key: value for key, value in mapping.items() if value in {"case", "control"}}
                 biological_units = self._biological_units(samples, mapping)
+                fallback_unit_samples = [
+                    sample_id for sample_id in mapping
+                    if biological_units.get(sample_id, sample_id) == sample_id
+                ]
+                unit_coverage = 1.0 - len(fallback_unit_samples) / max(1, len(mapping))
                 grouped_units: dict[str, set[str]] = {"case": set(), "control": set()}
                 unit_groups: dict[str, set[str]] = {}
                 for sample_id, group in mapping.items():
@@ -648,6 +667,10 @@ class GEOMetadataAuditTool(ScientificTool):
                     unit_groups.setdefault(unit, set()).add(group)
                 counts = {group: len(units) for group, units in grouped_units.items()}
                 reasons = []
+                if disease and not disease_hit:
+                    reasons.append("disease_context_mismatch")
+                if mapping and unit_coverage < 1.0:
+                    reasons.append("biological_unit_unverifiable")
                 if counts["case"] < minimum or counts["control"] < minimum:
                     reasons.append(f"requires_at_least_{minimum}_biological_replicates_per_group")
                 if confidence < confidence_gate:
@@ -672,6 +695,8 @@ class GEOMetadataAuditTool(ScientificTool):
                 detail = {
                     "candidate": audited.model_dump(mode="json"), "group_mapping": mapping,
                     "sample_aliases": aliases, "biological_units": biological_units,
+                    "biological_unit_coverage": round(unit_coverage, 3),
+                    "biological_unit_fallback_samples": fallback_unit_samples,
                     "series_matrix_uri": matrix_url,
                 }
                 audit_cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -968,6 +993,7 @@ def _prepare_counts(frame, recipe: AnalysisRecipe, minimum: int):
 
 
 def _prepare_continuous_expression(frame, recipe: AnalysisRecipe, minimum: int):
+    import numpy as np
     import pandas as pd
 
     aliases: dict[str, list[str]] = recipe.parameters.get("sample_aliases", {})
@@ -1011,7 +1037,17 @@ def _prepare_continuous_expression(frame, recipe: AnalysisRecipe, minimum: int):
     independent = Counter(metadata["condition"])
     if independent["case"] < minimum or independent["control"] < minimum:
         raise ValueError("fewer than required independent biological units after technical-replicate aggregation")
-    return expression, metadata, gene_column
+    values = expression.to_numpy(dtype=float)
+    has_negative = bool((values < 0).any()) if values.size else False
+    max_value = float(values.max()) if values.size else 0.0
+    all_integer = bool(np.allclose(values, np.rint(values), atol=1e-6)) if values.size else True
+    if not has_negative and all_integer and max_value > 1000:
+        raise ValueError(
+            "continuous expression matrix appears to contain raw or unlogged integer counts; "
+            "fixed limma requires log-scale normalized expression"
+        )
+    normalization_unverified = not has_negative
+    return expression, metadata, gene_column, normalization_unverified
 
 
 def _run_pydeseq2(counts, metadata, recipe: AnalysisRecipe, n_cpus: int):
@@ -1141,7 +1177,7 @@ class BulkExpressionAnalysisTool(ScientificTool):
 
                     path, checksum, cached = _download_file(context, recipe.accession, recipe.input_uri)
                     frame = _read_expression_table(path)
-                    expression, metadata, gene_column = _prepare_continuous_expression(
+                    expression, metadata, gene_column, normalization_unverified = _prepare_continuous_expression(
                         frame, recipe, context.task.constraints.dataset_selection.min_biological_replicates_per_group
                     )
                     qc_summary, qc_artifacts = _write_expression_qc(expression, context.run_dir, recipe.accession)
@@ -1191,8 +1227,13 @@ class BulkExpressionAnalysisTool(ScientificTool):
                             ),
                             stance=Stance.SUPPORTS, effect_direction="increase" if lfc > 0 else "decrease",
                             effect={"log2fc": lfc, "fdr": padj, "omics_strength": round(strength, 6), "accession": recipe.accession},
-                            uncertainty="Differential expression is observational and platform annotation may be incomplete.",
-                            quality_flags=["observational_not_causal", "continuous_expression"],
+                            uncertainty=(
+                                "Differential expression is observational and platform annotation may be incomplete."
+                                + (" Normalization/log status could not be verified from the matrix itself."
+                                   if normalization_unverified else "")
+                            ),
+                            quality_flags=["observational_not_causal", "continuous_expression"]
+                            + (["normalization_unverified"] if normalization_unverified else []),
                             context_match_score=float(recipe.parameters.get("dataset_context_match_score", 0.85)),
                         ))
                     summaries.append({
@@ -1204,6 +1245,7 @@ class BulkExpressionAnalysisTool(ScientificTool):
                         "design": recipe.design, "contrast": recipe.contrast, "qc_summary": qc_summary,
                         "qc_artifacts": [item.model_dump(mode="json") for item in qc_artifacts],
                         "gene_column": str(gene_column), "result_artifact": artifact.model_dump(mode="json"),
+                        "normalization_unverified": normalization_unverified,
                         "software_versions": {"limma": "R package runtime-checked"},
                     })
                 except (requests.RequestException, ValueError, TypeError, OSError, ImportError, subprocess.SubprocessError) as exc:

@@ -1,0 +1,107 @@
+{
+  "$defs": {
+    "RepairAction": {
+      "enum": [
+        "rerun_subgraph_same_inputs",
+        "switch_dataset_same_context",
+        "supplement_evidence",
+        "exclude_evidence",
+        "split_context_same_scope",
+        "downgrade_claim",
+        "request_input",
+        "retain_gap",
+        "stop"
+      ],
+      "title": "RepairAction",
+      "type": "string"
+    },
+    "RepairAuthorization": {
+      "enum": [
+        "automatic",
+        "checkpoint_required",
+        "human_input_required",
+        "prohibited"
+      ],
+      "title": "RepairAuthorization",
+      "type": "string"
+    },
+    "RepairRisk": {
+      "enum": [
+        "R0_derivation_only",
+        "R1_same_scope_read_only",
+        "R2_scientific_method_change",
+        "R3_scope_or_truth_change"
+      ],
+      "title": "RepairRisk",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Typed domain repair intent; the policy layer decides whether it may execute.",
+  "properties": {
+    "contract_version": {
+      "const": "3.0.0",
+      "default": "3.0.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "directive_id": {
+      "pattern": "^directive-[a-f0-9]{24}$",
+      "title": "Directive Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "work_item_id": {
+      "title": "Work Item Id",
+      "type": "string"
+    },
+    "operation": {
+      "$ref": "#/$defs/RepairAction"
+    },
+    "subject_key": {
+      "minLength": 1,
+      "title": "Subject Key",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "expected_risk": {
+      "$ref": "#/$defs/RepairRisk"
+    },
+    "expected_authorization": {
+      "$ref": "#/$defs/RepairAuthorization"
+    },
+    "rationale": {
+      "minLength": 1,
+      "title": "Rationale",
+      "type": "string"
+    },
+    "proposed_by": {
+      "default": "deterministic_reviewer",
+      "title": "Proposed By",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "directive_id",
+    "project_id",
+    "work_item_id",
+    "operation",
+    "subject_key",
+    "expected_risk",
+    "expected_authorization",
+    "rationale"
+  ],
+  "title": "RepairDirective",
+  "type": "object"
+}

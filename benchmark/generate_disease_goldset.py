@@ -56,6 +56,14 @@ def expectation_assertions(expectation: dict, live: bool) -> list[dict]:
         assertions.append({"type": "terminal_status_in", "values": list(statuses)})
     if expectation.get("must_not_claim_causal"):
         assertions.append({"type": "no_causal_claims"})
+    min_reference = expectation.get("min_reference_genes_in_evidence")
+    reference_genes = expectation.get("reference_genes")
+    if min_reference and reference_genes:
+        assertions.append({
+            "type": "min_reference_genes_in_evidence",
+            "reference_genes": list(reference_genes),
+            "min_count": int(min_reference),
+        })
     if live:
         for category in expectation.get("reviewer_categories", []):
             if category in GUARANTEED_PROBE_CATEGORIES:

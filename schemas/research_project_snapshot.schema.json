@@ -1,5 +1,101 @@
 {
   "$defs": {
+    "ArtifactHead": {
+      "additionalProperties": false,
+      "description": "Durable CAS-updated pointer to the active version of one logical artifact.\n\nVersion rows in artifact_versions.jsonl remain immutable and auditable;\nthis head only states which version is current for consumers such as the\nReviewer, so old versions are never lost.",
+      "properties": {
+        "contract_version": {
+          "const": "3.0.0",
+          "default": "3.0.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "artifact_id": {
+          "pattern": "^artifact-[a-f0-9]{24}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "work_item_id": {
+          "title": "Work Item Id",
+          "type": "string"
+        },
+        "logical_name": {
+          "minLength": 1,
+          "title": "Logical Name",
+          "type": "string"
+        },
+        "version_id": {
+          "pattern": "^artifact-version-[a-f0-9]{24}$",
+          "title": "Version Id",
+          "type": "string"
+        },
+        "record_id": {
+          "pattern": "^artifact-[a-f0-9]{12,24}$",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "default": "application/octet-stream",
+          "title": "Media Type",
+          "type": "string"
+        },
+        "uri": {
+          "pattern": "^project://",
+          "title": "Uri",
+          "type": "string"
+        },
+        "updated_by_attempt_id": {
+          "anyOf": [
+            {
+              "pattern": "^attempt-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By Attempt Id"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "project_id",
+        "work_item_id",
+        "logical_name",
+        "version_id",
+        "record_id",
+        "version",
+        "sha256",
+        "size_bytes",
+        "uri"
+      ],
+      "title": "ArtifactHead",
+      "type": "object"
+    },
     "ArtifactRecord": {
       "additionalProperties": false,
       "properties": {
@@ -66,6 +162,102 @@
         "size_bytes"
       ],
       "title": "ArtifactRecord",
+      "type": "object"
+    },
+    "ArtifactVersion": {
+      "additionalProperties": false,
+      "description": "Immutable content-addressable version of one logical artifact.",
+      "properties": {
+        "contract_version": {
+          "const": "3.0.0",
+          "default": "3.0.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "version_id": {
+          "pattern": "^artifact-version-[a-f0-9]{24}$",
+          "title": "Version Id",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "artifact_id": {
+          "pattern": "^artifact-[a-f0-9]{24}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "record_id": {
+          "pattern": "^artifact-[a-f0-9]{12,24}$",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "work_item_id": {
+          "title": "Work Item Id",
+          "type": "string"
+        },
+        "logical_name": {
+          "minLength": 1,
+          "title": "Logical Name",
+          "type": "string"
+        },
+        "media_type": {
+          "default": "application/octet-stream",
+          "title": "Media Type",
+          "type": "string"
+        },
+        "uri": {
+          "pattern": "^project://",
+          "title": "Uri",
+          "type": "string"
+        },
+        "supersedes_version_id": {
+          "anyOf": [
+            {
+              "pattern": "^artifact-version-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Supersedes Version Id"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version_id",
+        "project_id",
+        "artifact_id",
+        "record_id",
+        "version",
+        "sha256",
+        "size_bytes",
+        "work_item_id",
+        "logical_name",
+        "uri"
+      ],
+      "title": "ArtifactVersion",
       "type": "object"
     },
     "AssessmentDimension": {
@@ -332,6 +524,287 @@
       "title": "FailureClass",
       "type": "string"
     },
+    "ForkDirective": {
+      "additionalProperties": false,
+      "description": "Immutable user-issued intent to roll a project back to a work item.",
+      "properties": {
+        "contract_version": {
+          "const": "3.0.0",
+          "default": "3.0.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "fork_directive_id": {
+          "pattern": "^fork-[a-f0-9]{24}$",
+          "title": "Fork Directive Id",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "branch_id": {
+          "pattern": "^branch-[a-f0-9]{24}$",
+          "title": "Branch Id",
+          "type": "string"
+        },
+        "target_work_item_id": {
+          "title": "Target Work Item Id",
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/ForkMode"
+        },
+        "rollback_to_attempt_id": {
+          "anyOf": [
+            {
+              "pattern": "^attempt-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rollback To Attempt Id"
+        },
+        "snapshot_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Snapshot Digest",
+          "type": "string"
+        },
+        "input_overrides": {
+          "additionalProperties": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Input Overrides",
+          "type": "object"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "actor": {
+          "minLength": 1,
+          "title": "Actor",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fork_directive_id",
+        "project_id",
+        "branch_id",
+        "target_work_item_id",
+        "mode",
+        "snapshot_digest",
+        "rationale",
+        "actor"
+      ],
+      "title": "ForkDirective",
+      "type": "object"
+    },
+    "ForkMode": {
+      "description": "How a user-issued rollback should behave.",
+      "enum": [
+        "redo",
+        "restore"
+      ],
+      "title": "ForkMode",
+      "type": "string"
+    },
+    "PlanBranch": {
+      "additionalProperties": false,
+      "description": "Append-only snapshot of one user-issued rollback branch.\n\nStatus transitions append new snapshots; ``read_branches`` returns the\nlatest snapshot per branch id so the branch history stays auditable.",
+      "properties": {
+        "contract_version": {
+          "const": "3.0.0",
+          "default": "3.0.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "branch_id": {
+          "pattern": "^branch-[a-f0-9]{24}$",
+          "title": "Branch Id",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "base_plan_id": {
+          "title": "Base Plan Id",
+          "type": "string"
+        },
+        "parent_branch_id": {
+          "anyOf": [
+            {
+              "pattern": "^branch-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Branch Id"
+        },
+        "fork_directive_id": {
+          "pattern": "^fork-[a-f0-9]{24}$",
+          "title": "Fork Directive Id",
+          "type": "string"
+        },
+        "revision_id": {
+          "anyOf": [
+            {
+              "pattern": "^revision-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision Id"
+        },
+        "fork_point_item_id": {
+          "title": "Fork Point Item Id",
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/ForkMode"
+        },
+        "rollback_to_attempt_id": {
+          "anyOf": [
+            {
+              "pattern": "^attempt-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rollback To Attempt Id"
+        },
+        "fork_count": {
+          "maximum": 30,
+          "minimum": 1,
+          "title": "Fork Count",
+          "type": "integer"
+        },
+        "superseded_item_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Superseded Item Ids",
+          "type": "array"
+        },
+        "added_item_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Added Item Ids",
+          "type": "array"
+        },
+        "before_snapshot_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Before Snapshot Digest",
+          "type": "string"
+        },
+        "after_snapshot_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "After Snapshot Digest"
+        },
+        "resolved_snapshot_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolved Snapshot Digest"
+        },
+        "status": {
+          "$ref": "#/$defs/PlanBranchStatus",
+          "default": "proposed"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "applied_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Applied At"
+        },
+        "resolved_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolved At"
+        }
+      },
+      "required": [
+        "branch_id",
+        "project_id",
+        "base_plan_id",
+        "fork_directive_id",
+        "fork_point_item_id",
+        "mode",
+        "fork_count",
+        "superseded_item_ids",
+        "added_item_ids",
+        "before_snapshot_digest"
+      ],
+      "title": "PlanBranch",
+      "type": "object"
+    },
+    "PlanBranchStatus": {
+      "enum": [
+        "proposed",
+        "approved",
+        "applied",
+        "resolved",
+        "rejected",
+        "superseded"
+      ],
+      "title": "PlanBranchStatus",
+      "type": "string"
+    },
     "ProjectState": {
       "additionalProperties": false,
       "properties": {
@@ -389,7 +862,8 @@
                 "plan",
                 "work_item",
                 "repair",
-                "release"
+                "release",
+                "fork"
               ],
               "type": "string"
             },
@@ -466,6 +940,11 @@
     "RepairAction": {
       "enum": [
         "rerun_subgraph_same_inputs",
+        "switch_dataset_same_context",
+        "supplement_evidence",
+        "exclude_evidence",
+        "split_context_same_scope",
+        "downgrade_claim",
         "request_input",
         "retain_gap",
         "stop"
@@ -561,6 +1040,34 @@
           "default": "1.0.0",
           "title": "Policy Version",
           "type": "string"
+        },
+        "directive_id": {
+          "anyOf": [
+            {
+              "pattern": "^directive-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Directive Id"
+        },
+        "directive_payload": {
+          "additionalProperties": true,
+          "title": "Directive Payload",
+          "type": "object"
+        },
+        "no_scope_change": {
+          "default": true,
+          "title": "No Scope Change",
+          "type": "boolean"
+        },
+        "candidate_lane_recompute_required": {
+          "default": false,
+          "title": "Candidate Lane Recompute Required",
+          "type": "boolean"
         },
         "success_criteria": {
           "items": {
@@ -776,6 +1283,22 @@
           "title": "Rationale",
           "type": "string"
         },
+        "evidence_strategy_patterns": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Evidence Strategy Patterns",
+          "type": "array"
+        },
+        "paper_evidence": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Paper Evidence",
+          "type": "array"
+        },
         "created_at": {
           "title": "Created At",
           "type": "string"
@@ -827,21 +1350,68 @@
           "title": "Parent Revision Id"
         },
         "revision_number": {
-          "maximum": 2,
+          "maximum": 30,
           "minimum": 1,
           "title": "Revision Number",
           "type": "integer"
         },
         "repair_request_id": {
-          "pattern": "^repair-[a-f0-9]{24}$",
-          "title": "Repair Request Id",
-          "type": "string"
+          "anyOf": [
+            {
+              "pattern": "^repair-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repair Request Id"
+        },
+        "fork_branch_id": {
+          "anyOf": [
+            {
+              "pattern": "^branch-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fork Branch Id"
         },
         "operation": {
-          "const": "rerun_subgraph_same_inputs",
           "default": "rerun_subgraph_same_inputs",
+          "enum": [
+            "rerun_subgraph_same_inputs",
+            "switch_dataset_same_context",
+            "supplement_evidence",
+            "exclude_evidence",
+            "downgrade_claim",
+            "split_context_same_scope",
+            "fork_rollback"
+          ],
           "title": "Operation",
           "type": "string"
+        },
+        "directive_id": {
+          "anyOf": [
+            {
+              "pattern": "^directive-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Directive Id"
+        },
+        "payload": {
+          "additionalProperties": true,
+          "title": "Payload",
+          "type": "object"
         },
         "added_items": {
           "items": {
@@ -890,7 +1460,6 @@
         "project_id",
         "base_plan_id",
         "revision_number",
-        "repair_request_id",
         "added_items",
         "superseded_item_ids",
         "trigger_snapshot_digest",
@@ -936,6 +1505,35 @@
           "title": "Context",
           "type": "object"
         },
+        "workflow_template": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Executable workflow template id (workflows/*.yaml); None keeps the legacy hard-coded workflow.",
+          "title": "Workflow Template"
+        },
+        "workflow_template_sha256": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 0,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "SHA-256 of the frozen workflow template source file.",
+          "title": "Workflow Template Sha256"
+        },
         "autonomy_mode": {
           "$ref": "#/$defs/AutonomyMode",
           "default": "checkpointed"
@@ -954,6 +1552,13 @@
           "title": "Max Replans",
           "type": "integer"
         },
+        "max_forks": {
+          "default": 4,
+          "maximum": 30,
+          "minimum": 1,
+          "title": "Max Forks",
+          "type": "integer"
+        },
         "created_at": {
           "title": "Created At",
           "type": "string"
@@ -964,6 +1569,305 @@
         "goal"
       ],
       "title": "ResearchProjectSpec",
+      "type": "object"
+    },
+    "ReviewTarget": {
+      "additionalProperties": false,
+      "description": "Immutable set of artifact/result digests that a Reviewer may assess.",
+      "properties": {
+        "contract_version": {
+          "const": "3.0.0",
+          "default": "3.0.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "review_target_id": {
+          "pattern": "^review-target-[a-f0-9]{24}$",
+          "title": "Review Target Id",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "work_item",
+            "release",
+            "repair"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "work_item_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Work Item Id"
+        },
+        "work_item_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Work Item Ids",
+          "type": "array"
+        },
+        "result_digests": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Result Digests",
+          "type": "object"
+        },
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "snapshot_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Snapshot Digest",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "review_target_id",
+        "project_id",
+        "scope",
+        "snapshot_digest",
+        "reason"
+      ],
+      "title": "ReviewTarget",
+      "type": "object"
+    },
+    "WorkAttempt": {
+      "additionalProperties": false,
+      "description": "Immutable attempt record for one work-item execution.",
+      "properties": {
+        "contract_version": {
+          "const": "3.0.0",
+          "default": "3.0.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "attempt_id": {
+          "pattern": "^attempt-[a-f0-9]{24}$",
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "work_item_id": {
+          "title": "Work Item Id",
+          "type": "string"
+        },
+        "attempt_number": {
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Attempt Number",
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/WorkAttemptStatus"
+        },
+        "input_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Input Digest",
+          "type": "string"
+        },
+        "output_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Digest"
+        },
+        "worker_lease_id": {
+          "anyOf": [
+            {
+              "pattern": "^lease-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Worker Lease Id"
+        },
+        "supersedes_attempt_id": {
+          "anyOf": [
+            {
+              "pattern": "^attempt-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Supersedes Attempt Id"
+        },
+        "failure_class": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FailureClass"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completed At"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attempt_id",
+        "project_id",
+        "work_item_id",
+        "attempt_number",
+        "status",
+        "input_digest"
+      ],
+      "title": "WorkAttempt",
+      "type": "object"
+    },
+    "WorkAttemptStatus": {
+      "enum": [
+        "pending",
+        "running",
+        "completed",
+        "completed_with_gaps",
+        "failed",
+        "cancelled"
+      ],
+      "title": "WorkAttemptStatus",
+      "type": "string"
+    },
+    "WorkItemHead": {
+      "additionalProperties": false,
+      "description": "Durable CAS-updated pointer to the committed result of one work item.\n\nThe head is authoritative: the working result.json is only a mirror of\nthe immutable attempt snapshot it references, so recovery never guesses\nbusiness state from Trace events. Replaying the same committed attempt is\nan idempotent no-op.",
+      "properties": {
+        "contract_version": {
+          "const": "3.0.0",
+          "default": "3.0.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "head_id": {
+          "pattern": "^head-[a-f0-9]{12}$",
+          "title": "Head Id",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "work_item_id": {
+          "title": "Work Item Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "pattern": "^attempt-[a-f0-9]{24}$",
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "result_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Result Digest",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/WorkItemStatus"
+        },
+        "version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "supersedes_head_id": {
+          "anyOf": [
+            {
+              "pattern": "^head-[a-f0-9]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Supersedes Head Id"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "work_item_id",
+        "attempt_id",
+        "result_digest",
+        "status"
+      ],
+      "title": "WorkItemHead",
       "type": "object"
     },
     "WorkItemResult": {
@@ -1077,6 +1981,19 @@
           ],
           "default": null,
           "title": "Repair Request Id"
+        },
+        "fork_branch_id": {
+          "anyOf": [
+            {
+              "pattern": "^branch-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fork Branch Id"
         },
         "started_at": {
           "title": "Started At",
@@ -1208,6 +2125,19 @@
           ],
           "default": null,
           "title": "Repair Request Id"
+        },
+        "fork_branch_id": {
+          "anyOf": [
+            {
+              "pattern": "^branch-[a-f0-9]{24}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fork Branch Id"
         }
       },
       "required": [
@@ -1233,6 +2163,82 @@
       ],
       "title": "WorkItemStatus",
       "type": "string"
+    },
+    "WorkerLease": {
+      "additionalProperties": false,
+      "description": "CAS-bound claim that one worker may execute one work item attempt.",
+      "properties": {
+        "contract_version": {
+          "const": "3.0.0",
+          "default": "3.0.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "lease_id": {
+          "pattern": "^lease-[a-f0-9]{24}$",
+          "title": "Lease Id",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "work_item_id": {
+          "title": "Work Item Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "pattern": "^attempt-[a-f0-9]{24}$",
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "worker_id": {
+          "minLength": 1,
+          "title": "Worker Id",
+          "type": "string"
+        },
+        "version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "acquired_at": {
+          "title": "Acquired At",
+          "type": "string"
+        },
+        "expires_at": {
+          "minLength": 1,
+          "title": "Expires At",
+          "type": "string"
+        },
+        "heartbeat_at": {
+          "title": "Heartbeat At",
+          "type": "string"
+        },
+        "released_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Released At"
+        }
+      },
+      "required": [
+        "lease_id",
+        "project_id",
+        "work_item_id",
+        "attempt_id",
+        "worker_id",
+        "expires_at"
+      ],
+      "title": "WorkerLease",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -1337,11 +2343,74 @@
       "title": "Repair Resolutions",
       "type": "array"
     },
+    "fork_directives": {
+      "items": {
+        "$ref": "#/$defs/ForkDirective"
+      },
+      "title": "Fork Directives",
+      "type": "array"
+    },
+    "plan_branches": {
+      "items": {
+        "$ref": "#/$defs/PlanBranch"
+      },
+      "title": "Plan Branches",
+      "type": "array"
+    },
+    "work_attempts": {
+      "items": {
+        "$ref": "#/$defs/WorkAttempt"
+      },
+      "title": "Work Attempts",
+      "type": "array"
+    },
+    "artifact_versions": {
+      "items": {
+        "$ref": "#/$defs/ArtifactVersion"
+      },
+      "title": "Artifact Versions",
+      "type": "array"
+    },
+    "review_targets": {
+      "items": {
+        "$ref": "#/$defs/ReviewTarget"
+      },
+      "title": "Review Targets",
+      "type": "array"
+    },
+    "worker_leases": {
+      "items": {
+        "$ref": "#/$defs/WorkerLease"
+      },
+      "title": "Worker Leases",
+      "type": "array"
+    },
+    "work_item_heads": {
+      "items": {
+        "$ref": "#/$defs/WorkItemHead"
+      },
+      "title": "Work Item Heads",
+      "type": "array"
+    },
+    "artifact_heads": {
+      "items": {
+        "$ref": "#/$defs/ArtifactHead"
+      },
+      "title": "Artifact Heads",
+      "type": "array"
+    },
     "active_work_item_ids": {
       "items": {
         "type": "string"
       },
       "title": "Active Work Item Ids",
+      "type": "array"
+    },
+    "active_artifact_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Active Artifact Ids",
       "type": "array"
     },
     "release_snapshot_digest": {

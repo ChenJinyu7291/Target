@@ -1,0 +1,198 @@
+{
+  "$defs": {
+    "ForkMode": {
+      "description": "How a user-issued rollback should behave.",
+      "enum": [
+        "redo",
+        "restore"
+      ],
+      "title": "ForkMode",
+      "type": "string"
+    },
+    "PlanBranchStatus": {
+      "enum": [
+        "proposed",
+        "approved",
+        "applied",
+        "resolved",
+        "rejected",
+        "superseded"
+      ],
+      "title": "PlanBranchStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Append-only snapshot of one user-issued rollback branch.\n\nStatus transitions append new snapshots; ``read_branches`` returns the\nlatest snapshot per branch id so the branch history stays auditable.",
+  "properties": {
+    "contract_version": {
+      "const": "3.0.0",
+      "default": "3.0.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "branch_id": {
+      "pattern": "^branch-[a-f0-9]{24}$",
+      "title": "Branch Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "base_plan_id": {
+      "title": "Base Plan Id",
+      "type": "string"
+    },
+    "parent_branch_id": {
+      "anyOf": [
+        {
+          "pattern": "^branch-[a-f0-9]{24}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Branch Id"
+    },
+    "fork_directive_id": {
+      "pattern": "^fork-[a-f0-9]{24}$",
+      "title": "Fork Directive Id",
+      "type": "string"
+    },
+    "revision_id": {
+      "anyOf": [
+        {
+          "pattern": "^revision-[a-f0-9]{24}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Revision Id"
+    },
+    "fork_point_item_id": {
+      "title": "Fork Point Item Id",
+      "type": "string"
+    },
+    "mode": {
+      "$ref": "#/$defs/ForkMode"
+    },
+    "rollback_to_attempt_id": {
+      "anyOf": [
+        {
+          "pattern": "^attempt-[a-f0-9]{24}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rollback To Attempt Id"
+    },
+    "fork_count": {
+      "maximum": 30,
+      "minimum": 1,
+      "title": "Fork Count",
+      "type": "integer"
+    },
+    "superseded_item_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Superseded Item Ids",
+      "type": "array"
+    },
+    "added_item_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Added Item Ids",
+      "type": "array"
+    },
+    "before_snapshot_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Before Snapshot Digest",
+      "type": "string"
+    },
+    "after_snapshot_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "After Snapshot Digest"
+    },
+    "resolved_snapshot_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resolved Snapshot Digest"
+    },
+    "status": {
+      "$ref": "#/$defs/PlanBranchStatus",
+      "default": "proposed"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "applied_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Applied At"
+    },
+    "resolved_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resolved At"
+    }
+  },
+  "required": [
+    "branch_id",
+    "project_id",
+    "base_plan_id",
+    "fork_directive_id",
+    "fork_point_item_id",
+    "mode",
+    "fork_count",
+    "superseded_item_ids",
+    "added_item_ids",
+    "before_snapshot_digest"
+  ],
+  "title": "PlanBranch",
+  "type": "object"
+}

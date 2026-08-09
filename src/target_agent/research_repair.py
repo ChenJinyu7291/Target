@@ -166,21 +166,43 @@ def _authorization_allowed_by_autonomy(
 
 def _subcontext_refines_frozen_scope(
     project: ResearchProjectSpec, dimension: str, value: str,
+    evidence_value: str | None = None,
 ) -> bool:
     """Return True when a proposed sub-context narrows or equals the frozen
-    TaskSpec value for the same dimension. Missing frozen constraints accept
-    any non-empty refinement; broader values are rejected."""
+    TaskSpec value for the same dimension. When the frozen TaskSpec leaves the
+    dimension open, the refinement must be anchored in the evidence item's own
+    declared context; arbitrary non-empty refinements are rejected."""
     if dimension not in FROZEN_CONTEXT_DIMENSIONS or not value.strip():
         return False
     task = project.context.get("target_task_spec")
     if not isinstance(task, dict) or not isinstance(task.get("context"), dict):
         return False
     frozen = task["context"].get(dimension)
-    if frozen is None or not str(frozen).strip():
-        return True
     sub_text = value.strip().casefold()
+    if frozen is None or not str(frozen).strip():
+        if not evidence_value or not str(evidence_value).strip():
+            return False
+        evidence_text = str(evidence_value).strip().casefold()
+        return sub_text == evidence_text or sub_text in evidence_text or evidence_text in sub_text
     frozen_text = str(frozen).strip().casefold()
     return sub_text == frozen_text or frozen_text in sub_text
+
+
+def _float_or(value: Any, default: float) -> float:
+    try:
+        return float(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _replacement_dataset_score(row: dict[str, Any]) -> tuple[float, float, int, int]:
+    """Rank qualified replacement datasets by context match, metadata confidence,
+    and independent sample counts; never pick the first eligible row blindly."""
+    context_match = _float_or(row.get("context_match_score") or row.get("dataset_context_match_score"), 0.0)
+    confidence = _float_or(row.get("metadata_confidence"), 0.0)
+    samples = int(row.get("case_count") or 0) + int(row.get("control_count") or 0)
+    total = int(row.get("sample_count") or 0)
+    return (context_match, confidence, samples, total)
 
 
 def canonical_sha256(value: BaseModel | dict[str, Any] | list[Any]) -> str:
@@ -787,7 +809,14 @@ def _propose_domain_finding_repair(
                 if not isinstance(raw_sub, dict) or set(raw_sub) != {dimension}:
                     continue
                 value = str(raw_sub.get(dimension) or "").strip()
-                if not value or not _subcontext_refines_frozen_scope(project, dimension, value):
+                evidence_row = derived.get(eid) or {}
+                evidence_context = evidence_row.get("context")
+                evidence_value = None
+                if isinstance(evidence_context, dict):
+                    evidence_value = str(evidence_context.get(dimension) or "")
+                if not value or not _subcontext_refines_frozen_scope(
+                    project, dimension, value, evidence_value,
+                ):
                     continue
                 scoped[eid] = {dimension: value}
             reason = str(finding["subject"].get("reason") or finding["message"] or "").strip()
@@ -931,7 +960,7 @@ def propose_domain_repair(
             for by_id in plan.items if by_id.item_id in affected
         ):
             continue
-        selected = eligible[0]
+        selected = max(eligible, key=_replacement_dataset_score)
         if not _authorization_allowed_by_autonomy(
             project, DOMAIN_REPAIR_POLICY[RepairAction.SWITCH_DATASET_SAME_CONTEXT][1],
         ):
@@ -940,6 +969,7 @@ def propose_domain_repair(
             "preferred_dataset_accessions": [str(selected.get("accession") or selected.get("dataset_id"))],
             "excluded_dataset_accessions": rejected,
             "replacement_dataset": selected,
+            "selection_reason": "best_context_match_after_rejection",
         }
         directive = RepairDirective(
             directive_id=_stable_id("directive", {

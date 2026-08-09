@@ -7,10 +7,10 @@ ARG TARGET_EXTRAS=mcp
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    RESEARCH_AGENT_PROJECT_DIR=/opt/target/projects \
-    TARGET_AGENT_RUN_DIR=/opt/target/runs \
-    TARGET_AGENT_CACHE_DIR=/opt/target/cache \
-    TARGET_AGENT_INPUT_ROOT=/opt/target/data/input
+    RESEARCH_AGENT_PROJECT_DIR=/data/projects \
+    TARGET_AGENT_RUN_DIR=/data/runs \
+    TARGET_AGENT_CACHE_DIR=/data/cache \
+    TARGET_AGENT_INPUT_ROOT=/data/input
 
 WORKDIR /opt/target
 
@@ -23,9 +23,9 @@ COPY paper_strategy ./paper_strategy
 
 RUN pip install --upgrade pip && \
     pip install ".[${TARGET_EXTRAS}]" && \
-    mkdir -p /opt/target/projects /opt/target/runs /opt/target/cache /opt/target/data/input /data && \
+    mkdir -p /data/projects /data/runs /data/cache /data/input && \
     useradd --create-home --uid 10001 --shell /usr/sbin/nologin target && \
-    chown -R target:target /opt/target/projects /opt/target/runs /opt/target/cache /opt/target/data/input /data
+    chown -R target:target /data
 
 # Overridable persistent data volume (see docker-compose.yml)
 VOLUME ["/data"]

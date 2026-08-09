@@ -1,0 +1,96 @@
+{
+  "additionalProperties": false,
+  "description": "Immutable content-addressable version of one logical artifact.",
+  "properties": {
+    "contract_version": {
+      "const": "3.0.0",
+      "default": "3.0.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "version_id": {
+      "pattern": "^artifact-version-[a-f0-9]{24}$",
+      "title": "Version Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "artifact_id": {
+      "pattern": "^artifact-[a-f0-9]{24}$",
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "record_id": {
+      "pattern": "^artifact-[a-f0-9]{12,24}$",
+      "title": "Record Id",
+      "type": "string"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    },
+    "size_bytes": {
+      "minimum": 0,
+      "title": "Size Bytes",
+      "type": "integer"
+    },
+    "work_item_id": {
+      "title": "Work Item Id",
+      "type": "string"
+    },
+    "logical_name": {
+      "minLength": 1,
+      "title": "Logical Name",
+      "type": "string"
+    },
+    "media_type": {
+      "default": "application/octet-stream",
+      "title": "Media Type",
+      "type": "string"
+    },
+    "uri": {
+      "pattern": "^project://",
+      "title": "Uri",
+      "type": "string"
+    },
+    "supersedes_version_id": {
+      "anyOf": [
+        {
+          "pattern": "^artifact-version-[a-f0-9]{24}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes Version Id"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "version_id",
+    "project_id",
+    "artifact_id",
+    "record_id",
+    "version",
+    "sha256",
+    "size_bytes",
+    "work_item_id",
+    "logical_name",
+    "uri"
+  ],
+  "title": "ArtifactVersion",
+  "type": "object"
+}

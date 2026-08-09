@@ -881,11 +881,16 @@ async function proposeFork() {
     try { inputOverrides = JSON.parse(raw); }
     catch (_) { toast('输入覆盖必须是合法 JSON', 'error'); return; }
   }
+  const actor = currentActor();
+  if (!actor) {
+    toast('只读会话不能发起回退', 'error');
+    return;
+  }
   const body = {
     target_work_item_id: target,
     mode,
     rationale,
-    actor: 'scientist',
+    actor,
   };
   if (mode === 'restore') body.rollback_to_attempt_id = $('fork-attempt').value || null;
   if (inputOverrides) body.input_overrides = inputOverrides;
@@ -977,7 +982,7 @@ async function sendSessionMessage(askAgent) {
     await api(`/api/projects/${currentProjectId}/sessions/${currentSessionId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, ask_agent: askAgent, actor: 'researcher' }),
+      body: JSON.stringify({ text, ask_agent: askAgent, actor: currentSessionRole || 'researcher' }),
     });
     input.value = '';
     await loadSessionMessages(currentProjectId, currentSessionId);

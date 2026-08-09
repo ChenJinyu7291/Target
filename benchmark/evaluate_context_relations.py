@@ -26,6 +26,8 @@ def evaluate(gold: list[dict[str, Any]], predictions: list[dict[str, Any]]) -> d
     totals: Counter[str] = Counter()
     passed: Counter[str] = Counter()
     by_family: dict[str, Counter[str]] = defaultdict(Counter)
+    by_split: dict[str, Counter[str]] = defaultdict(Counter)
+    split_case_counts: Counter[str] = Counter()
     failures: list[dict[str, Any]] = []
 
     for case in gold:
@@ -41,12 +43,16 @@ def evaluate(gold: list[dict[str, Any]], predictions: list[dict[str, Any]]) -> d
             ),
         }
         family = case["task_family"]
+        split = str(case.get("split") or "unknown")
+        split_case_counts[split] += 1
         for name, ok in checks.items():
             totals[name] += 1
             by_family[family][f"{name}_total"] += 1
+            by_split[split][f"{name}_total"] += 1
             if ok:
                 passed[name] += 1
                 by_family[family][f"{name}_passed"] += 1
+                by_split[split][f"{name}_passed"] += 1
         if not all(checks.values()):
             failures.append({"id": case["id"], "split": case["split"], "checks": checks})
 
@@ -57,12 +63,20 @@ def evaluate(gold: list[dict[str, Any]], predictions: list[dict[str, Any]]) -> d
             name: safe_div(counts[f"{name}_passed"], counts[f"{name}_total"])
             for name in totals
         }
+    split_metrics: dict[str, dict[str, float]] = {}
+    for split, counts in by_split.items():
+        split_metrics[split] = {
+            name: safe_div(counts[f"{name}_passed"], counts[f"{name}_total"])
+            for name in totals
+        }
     return {
         "gold_cases": len(gold),
         "prediction_rows": len(predictions),
         "duplicate_prediction_ids": duplicate_count,
         "metrics": metrics,
         "by_family": family_metrics,
+        "by_split": split_metrics,
+        "split_counts": dict(sorted(split_case_counts.items())),
         "failures": failures,
     }
 
