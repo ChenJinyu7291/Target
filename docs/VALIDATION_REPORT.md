@@ -201,3 +201,12 @@ The checkboxes above record the historical V2.1 remote-node baseline, not curren
   to MONDO:0005061 with matched=true and created=false; deterministic
   ask witness OK; repository policy REPO_POLICY=OK;
   TARGET_P29_ACCEPTANCE=OK.
+
+## Round-4 acceptance (2026-08-10)
+
+- Full remote pytest: 571 passed / 2 skipped / 3 warnings (before and after the alignment-environment upgrade).
+- Internal non-live benchmark: 14 tasks / 30 assertions / score 1.0 (BM-01..BM-14, fake+unit modes); this is not an external blind biological result.
+- Schema export: 55 generated schemas + 1 hand-maintained `context_relation_case.schema.json` = 56 consistent.
+- `scripts/repo_policy_check.py`: REPO_POLICY=OK; GitHub Actions CI on main `f4e2ece`: success.
+- User control plane (pause/cancel/resume): HTTP/CLI/MCP/Web, safe-boundary consumption, cancel is terminal and produces no report; round-4 focused tests 14 passed.
+- Reviewer LoRA retrain on the current dual-reviewed 120-row SFT set (data baseline commit `6de64c9`): adapter heldout 30 rows = 1.0 on all four rubric dimensions and fully_correct; base = 0.0 category_match/safe_action/fully_correct; `training_manifest.json` promotion_eligible=true; weights are not tracked in Git. This is a template-consistent contract heldout and does not establish open-world Reviewer quality.

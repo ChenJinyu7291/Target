@@ -15,6 +15,14 @@ Cross-module contracts, workflow choices, model boundaries and scientific-safety
 - `export-schemas` 不再删除手工维护的 benchmark schema（`context_relation_case.schema.json`），只维护 Pydantic 导出集合。
 - 远程验收（2026-08-10）：全量 pytest 571 passed / 2 skipped；round-4 聚焦测试 14 passed；benchmark 14 tasks / 30 assertions / score 1.0；schema 55 生成 + 1 手写 = 56 一致；repo_policy_check OK。
 
+## 2026-08-10 - Round-4 对齐训练收口
+
+- **Status:** accepted
+- 数据基线为 6de64c9 后的当前 reviewer_sft.jsonl（120 行双审齐全）；旧 V2.1 taxonomy adapter 不再作为当前对齐证据。
+- 重训配置与 RUNBOOK 一致（Qwen3-8B、LoRA r16/alpha32/dropout0.05、q/k/v/o、100 步、grad accum 8）：train_loss 0.593，promotion_eligible=true。
+- Heldout 30 行：adapter 四维度 + fully_correct 均 1.0；base category_match/safe_action/fully_correct 0.0；满足全部验收门槛。
+- 权重不入 Git；adapter 仅作可选 Reviewer 后端，确定性门禁保持权威；heldout 为模板一致场景，不构成开放世界质量声明。
+
 ## 2026-08-09 - Round-2 全项目审计修复与 Round-3 产品收口
 
 - **Status:** accepted

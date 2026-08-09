@@ -1,6 +1,6 @@
 # Target 产品化后续 PRD
 
-> 文档状态：下一阶段输入；当前基线（V2.2 科学主链 + V3 项目控制面）已于 2026-08-09 通过远程验收（492 passed / 2 skipped；benchmark 13 tasks / 29 assertions / score 1.0）。后续开发按团队决定执行。  
+> 文档状态：下一阶段输入；当前基线（V2.2 科学主链 + V3 项目控制面 3.1.0 + Round-4 控制面/盲测协议/对齐重训）已于 2026-08-10 通过远程验收（571 passed / 2 skipped；benchmark 14 tasks / 30 assertions / score 1.0；repo policy OK；GitHub Actions CI 绿）。后续开发按团队决定执行。
 > 产品对象：面向疾病靶点发现的可追溯生命科学科研 Agent，而非通用聊天助手、独立评测平台或湿实验自动化系统。
 
 ## 1. 产品目标
@@ -77,7 +77,7 @@ Target 的差异化不是复制通用工作台，而是在这些控制面原则�
 
 ### P0：把当前可靠性闭环做完整（已完成，2026-08-09 验收）
 
-> 状态：P0.1–P0.4 已实现并通过 2026-08-09 全量 pytest（492 passed / 2 skipped）与 benchmark（13/13 tasks、29/29 assertions）；以下条目保留为设计与验收记录，详见 [COMPLETED.md](COMPLETED.md)。
+> 状态：P0.1–P0.4 已实现并通过 2026-08-09 全量 pytest（492 passed / 2 skipped）与 benchmark（13/13 tasks、29/29 assertions）；2026-08-10 Round-4 全量 pytest 571 passed / 2 skipped、benchmark 14/14 tasks、30/30 assertions；以下条目保留为设计与验收记录，详见 [COMPLETED.md](COMPLETED.md)。
 
 #### P0.1 工作尝试与不可变产物版本
 
@@ -137,6 +137,7 @@ recipe -> omics analysis -> enrichment -> candidate extraction
 - 覆盖阴性、冲突、缺失上下文、OOD、工具失败、数字错误和正确拒绝；
 - 科学与工程角色分离审核；只有通过复核的 CaseRecord 才能晋升训练集；
 - 建立数据卡、来源许可、去污染与版本管理。
+- **状态（2026-08-10）**：120 行 SFT 双审齐全；Qwen3-8B Reviewer LoRA 重训完成（数据基线 6de64c9，promotion_eligible=true）；heldout 30 行 adapter 全维度 1.0 vs base category_match 0.0；权重不入 Git，仅作可选 Reviewer 后端。局限：heldout 为模板一致合同场景，非开放世界质量。
 
 #### P1.3 外部盲测靶点排名 benchmark
 
@@ -144,6 +145,7 @@ recipe -> omics analysis -> enrichment -> candidate extraction
 - 专家给出分级相关性、trap、安全阻断和可验证理由；
 - 指标使用 disease-macro nDCG/Recall/MRR，加不可补偿的 trap/safety gate；
 - 公共输出仅含聚合结果，防止标签泄露。
+- **状态（2026-08-10）**：可执行盲测协议与合成夹具 BM-14 已合入（freeze→score、摘要 SHA-256 冻结、trap/safety 非补偿门禁，CI 可自动验证）；外部独立专家标签与主办方控制 scorer 仍待外部提供，无法由仓库内部完成。
 
 验收：至少一个完全未进入开发库的疾病批次，由独立专家完成盲评和分歧仲裁。
 
@@ -161,6 +163,7 @@ recipe -> omics analysis -> enrichment -> candidate extraction
 - 连接器 SDK 与能力清单，外部工具不能绕过合同；
 - 科研工作台中的项目视图、修复队列、证据图、差异对比和交付下载；
 - 公开部署文档、兼容性矩阵、迁移策略和稳定 API 版本。
+- **已实现（2026-08-10）**：长任务暂停/取消/恢复控制面（HTTP/CLI/MCP/Web），取消为终态且不生成报告；SSE 事件流与 /healthz、/api/capabilities 已具备。仍待办：认证、租户隔离、生产级多用户配额。
 
 ## 7. 核心验收案例
 
@@ -190,6 +193,6 @@ recipe -> omics analysis -> enrichment -> candidate extraction
 2. 实现同上下文数据集替换及依赖失效 —— 已完成（P0.3）；
 3. 把领域 finding 转换为类型化 repair directive —— 已完成（P0.2）；
 4. 建立状态迁移 benchmark —— 已完成（P0.4，BM-01~BM-13 与错误注入回归）；
-5. 下一步优先级：P1.2 Alignment 数据闭环（团队决定延后）→ P1.3 外部盲测靶点排名 → P1.4 专家 release gate → P2 产品交付（认证、多租户、任务取消、可观测性）。
+5. 当前状态：P1.2 Alignment 数据闭环已完成（2026-08-10 重训 + heldout 验收）；P1.3 盲测协议/夹具（BM-14）已完成，外部专家盲评标签待主办方提供；P1.4 专家 release gate 与 P2 认证/多租户仍待办。
 
 本 PRD 是当前基线之后的开发输入，不代表其中路线已实现或已承诺发布日期。

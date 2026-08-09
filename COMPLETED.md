@@ -441,3 +441,11 @@ typed transient failure
 - 盲测靶点排名协议完成可执行合成夹具 BM-14：freeze→score、摘要 SHA-256 冻结、结构篡改与 trap/safety 非补偿门禁在 CI 可自动验证；`benchmark/runner.py` 非 live 14 任务 / 30 断言全通过。
 - 研究项目契约升至 `3.1.0`，新增 `research_project_control` JSON Schema；schema 导出保留手工维护的 `context_relation_case.schema.json`。
 - 远程验收通过（2026-08-10）：全量 pytest 571 passed / 2 skipped / 3 warnings；round-4 聚焦测试 14 passed；benchmark 14 tasks / 30 assertions / score 1.0；schema 55 个生成 + 1 个手写（context_relation_case）= 56 个一致；repo policy OK。
+
+## 23. 2026-08-10 Round-4 对齐训练收口（远程 GPU 验收）
+
+- 数据基线：`alignment_data/reviewer_sft.jsonl` 当前版本（120 行、6 类、双审齐全；基线 commit 6de64c9），旧 V2.1 taxonomy adapter 不再作为当前证据。
+- 重训：Qwen3-8B、bf16、LoRA r16/alpha32/dropout0.05、q/k/v/o、batch 1、grad accum 8、100 步，单 A100-40GB，train_loss 0.593，约 2.5 分钟；`training_manifest.json`：review_override=false、promotion_eligible=true。
+- Heldout（30 行）验收：base category_match/safe_action/fully_correct = 0.0；adapter json_valid/category_match/no_false_complete/safe_action/fully_correct = 1.0；满足 json_valid>=0.95 与 adapter>base 门槛；heldout 未入训练（120/30 独立）。
+- 环境变更后远程全量回归：pytest 571 passed / 2 skipped / 3 warnings；benchmark 14 tasks / 30 assertions / score 1.0；schema 55 生成 + 1 手写 = 56 一致；repo_policy_check OK。
+- 权重不入 Git；评估 JSON、manifest 与 `training_r4_report.md` 存于 `models/reviewer-lora/`（本地证据副本）。

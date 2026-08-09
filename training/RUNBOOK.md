@@ -101,3 +101,14 @@ the final promotion run trained WITHOUT the override:
 promotion_eligible: true`. If team policy requires a second independent
 reviewer, co-sign the worksheet, re-run mark_review.py with both names, and
 retrain per §3.
+
+## 7. Round-4 retrain (2026-08-10)
+
+- Data baseline: `alignment_data/reviewer_sft.jsonl` after commit `6de64c9` (120 rows, dual review complete).
+- Environment: single A100-PCIE-40GB (CUDA 12.4, torch 2.6.0+cu124); 100 steps, grad accum 8; train_loss 0.593; wall time ~149.6 s.
+- Heldout evaluation (30 rows, `training/evaluate_reviewer_lora.py`):
+  - base: json_valid 0.9333 / category_match 0.0 / no_false_complete 1.0 / safe_action 0.0 / fully_correct 0.0
+  - adapter: json_valid 1.0 / category_match 1.0 / no_false_complete 1.0 / safe_action 1.0 / fully_correct 1.0
+- `training_manifest.json`: `review_override: false`, `promotion_eligible: true`.
+- Evidence copies (not in Git): `models/reviewer-lora/{eval_base.json, eval_adapter.json, training_manifest.json, adapter_config.json, training_r4_report.md}`.
+- Limits are the same as in section 5: a template-consistent heldout, not open-world Reviewer quality; the dual review is not an independent two-person expert panel.
