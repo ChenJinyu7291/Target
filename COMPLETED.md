@@ -404,10 +404,10 @@ typed transient failure
 - 本仓库 Streamable HTTP MCP 状态统一为：**基础 transport 已完成（本地/可信网络绑定）**；认证、多租户与生产级发布未完成。
 
 ### 19.1 2026-08-09 第三轮全量检验与修复封口
-- 第一轮全量 pytest（430 tests）1日发现 25 失败，经修复与第二轮失败集重跑后仅剩 2 项；第三轮完成两项最终修复：
+- 第一轮全量 pytest（494 tests）发现 25 失败，经修复与第二轮失败集重跑后仅剩 2 项；第三轮完成两项最终修复：
   - 修复闭环实质复查（`_finding_recheck_substance`）按 finding 记录的实际类别执行检查：纯 coverage-gap 补充不再被 missing-provenance 的原始质症检查错误拦截，而真正的 provenance 缺失 finding 仍保持实质检查；
   - restore fork 的 head-backed 恢复 attempt 记载到活动 fork 点下，统一了旧测试与新恢复设计的记账期望（基础项保持单条历史 attempt，活动 fork 点为 2 条：redo attempt + restore attempt）；
-- 全量远程 pytest 重跑：**507 passed / 0 failed / 2 skipped**（-qq 模式，无摘要行，以进度序列和退出码确认）；repo policy 门禁 OK；
+- 全量远程 pytest 重跑：**492 passed / 0 failed / 2 skipped**（2026-08-09 远程 round3 全套，共 494 tests，含摘要行）；repo policy 门禁 OK；
 - benchmark 重跑刷新：13 tasks / 29 assertions / score 1.0（BM-01~BM-13 全 PASS），`benchmark/results/benchmark_report.{json,md}` 已同步；
 - 修复 benchmark 脚本将 pytest/policy 日志写入仓库内 `review/` 的问题：日志输出改为 WORKDIR 同级 `review/`（仓库外），避免远程执行资产（绝对路径/主机名）进入仓库并触发策略门禁；
-- 本轮未推送；合并/发布保留给团队评审。
+- 已按团队指示推送 `main`（`2c4bc76`）；后续合并/发布保留团队评审。
