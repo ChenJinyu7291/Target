@@ -1,0 +1,154 @@
+{
+  "contract_version": "1.0.0",
+  "benchmark_id": "target-dev-synthetic",
+  "split_id": "demo",
+  "adjudication": {
+    "status": "synthetic_fixture",
+    "reviewer_count": 2,
+    "reviewers_blinded": true,
+    "evidence_cutoff": "2026-08-01",
+    "source_snapshot_ids": [
+      "snapshot-synth-001"
+    ]
+  },
+  "cases": [
+    {
+      "case_id": "opaque-001",
+      "judgment_pool_id": "pool-synth-001",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "IL12B",
+          "grade": 3,
+          "source_ids": [
+            "synth-uc-1"
+          ]
+        },
+        {
+          "gene": "JAK2",
+          "grade": 2,
+          "source_ids": [
+            "synth-uc-2"
+          ]
+        },
+        {
+          "gene": "TYK2",
+          "grade": 2,
+          "source_ids": [
+            "synth-uc-3"
+          ]
+        },
+        {
+          "gene": "TNFSF15",
+          "grade": 1,
+          "source_ids": [
+            "synth-uc-4"
+          ]
+        }
+      ],
+      "trap_targets": [],
+      "safety_expectations": [
+        {
+          "gene": "IL12B",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "infection"
+          ],
+          "source_ids": [
+            "synth-uc-safety-1"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "opaque-002",
+      "judgment_pool_id": "pool-synth-002",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "TREM2",
+          "grade": 3,
+          "source_ids": [
+            "synth-ad-1"
+          ]
+        },
+        {
+          "gene": "APOE",
+          "grade": 3,
+          "source_ids": [
+            "synth-ad-2"
+          ]
+        },
+        {
+          "gene": "MS4A6A",
+          "grade": 2,
+          "source_ids": [
+            "synth-ad-3"
+          ]
+        },
+        {
+          "gene": "SPI1",
+          "grade": 1,
+          "source_ids": [
+            "synth-ad-4"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "ADAM17",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": []
+    },
+    {
+      "case_id": "opaque-003",
+      "judgment_pool_id": "pool-synth-003",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "GENE_A",
+          "grade": 3,
+          "source_ids": [
+            "synth-d3-1"
+          ]
+        },
+        {
+          "gene": "GENE_B",
+          "grade": 2,
+          "source_ids": [
+            "synth-d3-2"
+          ]
+        },
+        {
+          "gene": "GENE_C",
+          "grade": 2,
+          "source_ids": [
+            "synth-d3-3"
+          ]
+        }
+      ],
+      "trap_targets": [],
+      "safety_expectations": [
+        {
+          "gene": "GENE_C",
+          "allowed_decisions": [
+            "NO_GO",
+            "CONDITIONAL_GO"
+          ],
+          "required_blocker_terms": [
+            "cardiac"
+          ],
+          "source_ids": [
+            "synth-d3-safety-1"
+          ]
+        }
+      ]
+    }
+  ]
+}

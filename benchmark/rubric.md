@@ -95,3 +95,13 @@ python benchmark/blind_ranking.py score \
 
 No external expert-adjudicated label set or blind biological performance result is distributed in
 this repository yet. Until that exists, only the protocol and scorer may be claimed as implemented.
+
+## Synthetic development fixture (BM-14)
+
+`benchmark/demo_blind_ranking.py` + `benchmark/blind_demo_labels.json` exercise the complete
+freeze -> score pipeline with clearly synthetic labels (`adjudication.status = synthetic_fixture`).
+It builds three opaque runs, freezes task/ranking/status digests, loads the fixture labels only
+after freezing, and scores disease-macro nDCG@K / Recall@K / MRR@K plus trap-case rate,
+safety-blocker recall and unsafe-GO rate as non-compensating gates. BM-14 runs it in fake/unit
+mode as a release gate. This is a protocol and tooling check, not an external blind biological
+result; final suites still require expert-adjudicated labels held outside the repository.

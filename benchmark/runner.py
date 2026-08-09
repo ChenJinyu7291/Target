@@ -225,12 +225,32 @@ def unit_paper_rag_graph_projection() -> str | None:
     return None
 
 
+def unit_blind_protocol_synthetic() -> str | None:
+    import importlib.util
+
+    demo_path = ROOT / "benchmark" / "demo_blind_ranking.py"
+    spec = importlib.util.spec_from_file_location("demo_blind_ranking", demo_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with tempfile.TemporaryDirectory() as tmp:
+        public = module.run_demo(Path(tmp), ROOT / "benchmark" / "blind_demo_labels.json")
+        if not public["passed"]:
+            return f"blind protocol demo gates failed: {public['gates']}"
+        summary = public["summary"]
+        if summary["expert_adjudicated"]:
+            return "blind protocol demo must stay a synthetic fixture"
+        if summary["structurally_valid_cases"] != summary["cases"]:
+            return "blind protocol demo structural integrity failed"
+    return None
+
+
 UNIT_CHECKS = {
     "contract_version_gate": unit_contract_version_gate,
     "planner_whitelist": unit_planner_whitelist,
     "schema_export_valid": unit_schema_export_valid,
     "pattern_ablation_offline": unit_pattern_ablation_offline,
     "paper_rag_graph_projection": unit_paper_rag_graph_projection,
+    "blind_protocol_synthetic": unit_blind_protocol_synthetic,
 }
 
 

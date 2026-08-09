@@ -6,6 +6,8 @@ V3 adds an internal project-level reliability layer above the target-discovery r
 
 Product handoff: [next-stage PRD](PRD.md), [evidence-bounded completed capabilities](COMPLETED.md) and [offline status page](product_status.html).
 
+Documentation index: [docs/README.md](docs/README.md).
+
 ## Target-discovery workflow (V2.2)
 
 ## What V2.2 does
@@ -25,7 +27,7 @@ Disease -> GEO/CELLxGENE discovery -> metadata audit -> reviewed analysis recipe
 - ClinicalTrials.gov API v2 adds gene-named trial-registry evidence (`clinical_trials_gov`); claims are emitted only when the intervention or title text explicitly names the gene, and stopped trials are downgraded to uncertain.
 - The literature tool upgrades to full-text-aware RAG: open-access PMC full texts are section-parsed into a persistent shared FTS5 corpus with optional LLM reranking and bm25 fallback.
 - Two execution engines ship and are parity-tested: the legacy hand-rolled state machine and the LangGraph `StateGraph` runtime (default; `--runtime legacy` opts out). Both write contract-compatible, parity-tested observable artifacts and share the same checkpoint/resume contract.
-- A systematic benchmark lives in [benchmark/](benchmark/): `benchmark/goldset_v2.jsonl` defines 13 non-live contract/regression tasks (BM-01..BM-13, fake+unit modes) plus 3 opt-in live tasks (BM-L1..BM-L3), covering the main chain, robustness, determinism, recovery, contract gates and engine parity; `python benchmark/runner.py` must score 100% in fake+unit mode. `benchmark/results/benchmark_report.json` was refreshed on the remote profile on 2026-08-09: 13 tasks / 29 assertions / score 1.0 in non-live mode; live tasks require an explicit `--live` run. This is not an external blind biological result.
+- A systematic benchmark lives in [benchmark/](benchmark/): `benchmark/goldset_v2.jsonl` defines 13 non-live contract/regression tasks (BM-01..BM-13, fake+unit modes) plus 3 opt-in live tasks (BM-L1..BM-L3), covering the main chain, robustness, determinism, recovery, contract gates and engine parity; `python benchmark/runner.py` must score 100% in fake+unit mode. `benchmark/results/benchmark_report.json` was refreshed on the remote profile on 2026-08-09: 14 tasks / 30 assertions / score 1.0 in non-live mode; live tasks require an explicit `--live` run. This is not an external blind biological result.
 - The Reviewer LoRA pipeline (data + training + heldout evaluation + remote GPU runbook) is under [training/](training/); local CPU smoke is verified, full training runs on the external GPU profile only. At runtime the trained adapter acts as an optional probe-based confirmation layer inside the Reviewer (configure `TARGET_AGENT_REVIEWER_LORA_BASE`/`TARGET_AGENT_REVIEWER_LORA_ADAPTER`): deterministic gates stay authoritative, adapter answers are category-cross-checked and silently discarded on any parse/category failure, and SFT categories are mapped onto the canonical finding taxonomy before a ReviewerFinding is emitted.
 - The externally stored Reviewer adapter used in prior acceptance was trained on the earlier generic V2.1 failure taxonomy; model weights are not tracked in Git. V2.2 genetics gates are deterministic and authoritative; genetics-specific alignment examples require fresh scientific and engineering review and retraining before any model-alignment claim is upgraded.
 - PyDESeq2 accepts non-negative integer counts only. Continuous expression requires the explicitly enabled fixed limma backend.
@@ -58,9 +60,10 @@ The regression matrices do not measure biological ranking quality. A separate sc
 ranking protocol is documented in [benchmark/rubric.md](benchmark/rubric.md): Agent task, ranking
 and terminal-status artifacts are digest-frozen before a Git-external private label file is opened,
 then scored with
-disease-macro nDCG/Recall/MRR and independent trap/safety gates. The scorer is implemented; an
-external expert-adjudicated final label set, evaluator-controlled scorer and publishable blind
-performance result are not yet available.
+disease-macro nDCG/Recall/MRR and independent trap/safety gates. The scorer is implemented, and BM-14 runs a
+synthetic end-to-end development fixture (`benchmark/demo_blind_ranking.py` + `benchmark/blind_demo_labels.json`)
+as a release gate; an external expert-adjudicated final label set, evaluator-controlled scorer and
+publishable blind performance result are not yet available.
 
 ## Quickstart（产品路径）
 
