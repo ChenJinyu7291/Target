@@ -45,6 +45,23 @@ KNOWN_PRIVATE_IDENTIFIERS = (
 )
 
 
+def _read_text(path: Path) -> str:
+    """Read text files for policy scanning, decoding UTF-16 BOM variants.
+
+    Pytest and some Windows tools emit UTF-16 console logs; decoding them as
+    UTF-8 would silently mangle drive-letter paths and hostnames, letting
+    real infrastructure identifiers pass the gate.
+    """
+    head = path.read_bytes()[:4]
+    if head[:2] == b"\xff\xfe":
+        return path.read_bytes().decode("utf-16-le", errors="ignore")
+    if head[:2] == b"\xfe\xff":
+        return path.read_bytes().decode("utf-16-be", errors="ignore")
+    if head[:3] == b"\xef\xbb\xbf":
+        return path.read_text(encoding="utf-8-sig", errors="ignore")
+    return path.read_text(encoding="utf-8", errors="ignore")
+
+
 def scan_repo(root: Path | str = ROOT) -> list[str]:
     root = Path(root)
     violations = []
@@ -59,7 +76,7 @@ def scan_repo(root: Path | str = ROOT) -> list[str]:
             continue
         if path.suffix.lower() not in TEXT_SUFFIXES and path.name != ".env.example":
             continue
-        text = path.read_text(encoding="utf-8", errors="ignore")
+        text = _read_text(path)
         if any(pattern.search(text) for pattern in SECRET_PATTERNS):
             violations.append(f"possible secret: {relative}")
         if (

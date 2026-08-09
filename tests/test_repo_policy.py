@@ -52,6 +52,19 @@ def test_scan_repo_ignores_share_portal_redaction_examples(tmp_path):
     assert scan_repo(tmp_path) == []
 
 
+def test_scan_repo_detects_drive_paths_in_utf16_text(tmp_path):
+    path = tmp_path / "utf16.txt"
+    path.write_bytes(("run from G:\\deepcamp\\Target\n").encode("utf-16"))
+    violations = scan_repo(tmp_path)
+    assert any("local absolute path" in v and v.endswith("utf16.txt") for v in violations)
+
+
+def test_scan_repo_reads_utf16_without_false_negatives(tmp_path):
+    path = tmp_path / "clean_utf16.txt"
+    path.write_bytes(("all clear\n").encode("utf-16"))
+    assert scan_repo(tmp_path) == []
+
+
 def test_scan_repo_ignores_its_own_example_literals(tmp_path):
     _write(
         tmp_path,
