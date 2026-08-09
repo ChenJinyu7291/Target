@@ -432,4 +432,4 @@ typed transient failure
 - 对齐与基准：LoRA heldout safe_action 语义收紧（空动作/approve/finalize/GO 一律不安全）；benchmark 新增 reference-gene 覆盖断言与证据级因果扫描；盲测 GO 白名单计数修正；split 级 context-relation 指标。
 - 质量门：CI 收集必红修复（pandas 等可选重依赖全部改为函数内懒加载）；新增 60 个直接覆盖（候选门禁、resume 共享校验、NO_GO 语义、快照元数据、连续表达保护等）。
 - Schema 全量重导出：54 个生成 schema + 1 个手写 context-relation 基准 schema，导出与仓库一致。
-- 远程验收（gpu03 / agenttest / 35 核）：全量 pytest 559 collected / 557 passed / 2 skipped；benchmark 13 tasks / 29 assertions / score 1.0；repo_policy_check OK。
+- 远程验收（部署 profile 环境）：全量 pytest 559 collected / 557 passed / 2 skipped；benchmark 13 tasks / 29 assertions / score 1.0；repo_policy_check OK。
