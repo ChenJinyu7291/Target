@@ -1,8 +1,8 @@
 # Agent Benchmark Report
 
 - Gold set: `goldset_v2.jsonl` (live mode: False)
-- Tasks: 11/11 passed
-- Assertions: 27/27 passed (score 1.0)
+- Tasks: 13/13 passed
+- Assertions: 29/29 passed (score 1.0)
 
 | Task | Category | Result | Failed assertions |
 |---|---|---|---|
@@ -17,6 +17,8 @@
 | BM-09 Contract version gate rejects 2.0 tasks | contract | PASS | - |
 | BM-10 Planner fallback only uses whitelisted registered tools | contract | PASS | - |
 | BM-11 Exported JSON Schemas are valid Draft 2020-12 | contract | PASS | - |
+| BM-12 Offline pattern-few-shot ablation keeps deterministic plans valid and reports coverage | contract | PASS | - |
+| BM-13 Paper-RAG hits project as strategy-only graph nodes without leaking into evidence | contract | PASS | - |
 | BM-L1 Live: Alzheimer disease full pipeline | live | SKIPPED (live) | - |
 | BM-L2 Live: lung adenocarcinoma with GEO omics | live | SKIPPED (live) | - |
 | BM-L3 Live: clinical trials evidence retrieved for LUAD oncogenes | live | SKIPPED (live) | - |
@@ -29,4 +31,4 @@
 | migration | 3 | 3 | 1.0 |
 | determinism | 3 | 3 | 1.0 |
 | robustness | 4 | 4 | 1.0 |
-| contract | 3 | 3 | 1.0 |
+| contract | 5 | 5 | 1.0 |

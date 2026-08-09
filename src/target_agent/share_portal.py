@@ -34,7 +34,7 @@ _BLOCKED_KEYS = frozenset({
 
 _ABS_PATH_RE = re.compile(
     r"(?i)((?<![a-z0-9])[a-z]:[\\/]"
-    r"|(?<![a-z0-9])/(?:home|root|users|tmp|var|etc|opt|srv)/"
+    r"|(?<![a-z0-9])/(?:home|root|users|tmp|var|etc|opt|srv|data)/"
     r"|(?<![a-z0-9])\\\\)"
 )
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")

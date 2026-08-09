@@ -21,6 +21,7 @@ from target_agent.research_contracts import (
 )
 from target_agent.research_modules import ModuleExecution, ResearchModuleRegistry
 from target_agent.research_planner import ResearchPlanner
+from target_agent.research_repair import work_item_result_digest
 from target_agent.research_runtime import ResearchProjectRuntime
 from target_agent.research_service import ResearchDecisionError, ResearchProjectService
 from target_agent.research_store import ResearchProjectStore
@@ -356,9 +357,12 @@ def test_restore_fork_restores_historical_attempt_and_invalidates_descendants(tm
     assert results["literature_search__fork_1"].outputs["record_count"] == 1
     assert results["literature_search__fork_1"].fork_branch_id == restore_branch.branch_id
     assert results["literature_search__fork_1"].supersedes_result_digest is not None
-    # The restored result is the original attempt payload, not a new execution.
+    # The restored result is the original attempt payload, not a new execution:
+    # the base item keeps its single historical attempt, and the active fork
+    # point gains one head-backed restore bookkeeping attempt on top of its
+    # superseded redo attempt.
     assert len(store.read_attempts("literature_search")) == 1
-    assert len(store.read_attempts("literature_search__fork_1")) == 1
+    assert len(store.read_attempts("literature_search__fork_1")) == 2
     assert calls["literature_search"] == 2
     # Descendants were re-run on the restored base.
     assert results["hypothesis_generation__fork_1__fork_2"].status.value == "completed"
@@ -523,3 +527,64 @@ def test_web_api_proposes_decides_and_lists_forks(tmp_path):
     final_branches = client.get(f"/api/projects/{project.project_id}/branches").get_json()
     assert final_branches["branches"][0]["status"] == "resolved"
     assert len(final_branches["fork_directives"]) == 1
+
+def test_restore_fork_rebinds_head_and_attempt_without_rerunning_target(tmp_path):
+    runtime, calls = fork_runtime(tmp_path, record_count_aware=True)
+    service = ResearchProjectService(runtime)
+    project = research_project("project-fork-restore-head")
+    store = ResearchProjectStore(runtime.projects_dir, project.project_id)
+
+    runtime.run(project)
+    attempt_one = store.current_attempt("literature_search")
+    assert attempt_one is not None
+
+    service.propose_fork(
+        project_id=project.project_id,
+        target_work_item_id="literature_search",
+        mode="redo",
+        rationale="Increase the literature record count.",
+        actor="scientist",
+        input_overrides={"literature_search": {"record_count": 2}},
+    )
+    runtime.run(project, resume=True)
+    assert store.load_work_item_results()["literature_search__fork_1"].outputs["record_count"] == 2
+
+    service.propose_fork(
+        project_id=project.project_id,
+        target_work_item_id="literature_search",
+        mode="restore",
+        rollback_to_attempt_id=attempt_one.attempt_id,
+        rationale="Restore the first literature pass.",
+        actor="scientist",
+    )
+    restore_branch = store.read_branches()[-1]
+    service.decide_fork(
+        project_id=project.project_id,
+        branch_id=restore_branch.branch_id,
+        approve=True,
+        actor="reviewer",
+        rationale="Approve restoring attempt one.",
+        resume=True,
+    )
+
+    results = store.load_work_item_results()
+    restored = results["literature_search__fork_1"]
+    assert restored.outputs["record_count"] == 1
+    restored_digest = work_item_result_digest(restored)
+    head = store.read_work_item_head("literature_search__fork_1")
+    assert head is not None and head.result_digest == restored_digest
+    restore_attempt = next(
+        row for row in store.read_attempts("literature_search__fork_1")
+        if row.attempt_id == head.attempt_id
+    )
+    assert restore_attempt.supersedes_attempt_id == attempt_one.attempt_id
+    assert restore_attempt.output_digest == restored_digest
+    snapshot = store.load_attempt_result(head.attempt_id)
+    assert snapshot is not None and work_item_result_digest(snapshot) == restored_digest
+    # The target was restored, not re-executed.
+    assert calls["literature_search"] == 2
+    # head/attempt/result are consistent without relying on a descendant rerun.
+    store.assert_integrity()
+    # A later recovery pass must not discard the restored payload.
+    recovered = store.recover_work_item_results()
+    assert work_item_result_digest(recovered["literature_search__fork_1"]) == restored_digest

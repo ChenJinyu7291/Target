@@ -1,26 +1,33 @@
-# Five-minute workbench demo
+# Workbench demo and offline review guide
 
-The web workbench has two explicit modes:
-
-- **Acceptance-checked stored replay** reads an existing stored run and never calls Step or a public database. Acceptance covers Trace and artifact integrity, not biological truth.
-- **Live run** submits a new `TaskSpec 2.2.0`, streams SSE Trace events and may use configured external services.
-
-Never describe replay as a live run. The header, run identifier and Planner backend remain visible so the audience can distinguish them.
+The workbench no longer ships a stored-replay demo catalog: the repository does
+not contain the demo runs that older versions of this guide referenced, and
+`/api/demo/*` / `/api/runs/*` are legacy endpoints not used by the workbench.
+The recommended presentation path is a live project, with a single-file offline
+review page as the network-free fallback.
 
 ## Start and verify
 
-Infrastructure values belong in the external deployment profile. Supply the port, run directory and cache directory explicitly:
+Infrastructure values belong in the external deployment profile. Supply the
+port, projects, run and cache directories explicitly:
 
 ```bash
 target-agent doctor
 target-agent serve \
   --host 0.0.0.0 \
   --port "$TARGET_AGENT_PORT" \
+  --projects-dir "$TARGET_AGENT_PROJECT_DIR" \
   --runs-dir "$TARGET_AGENT_RUN_DIR" \
   --cache-dir "$TARGET_AGENT_CACHE_DIR"
 ```
 
-When the service runs on a compute node, create a local tunnel using the deployment profile rather than recording the host in Git:
+Binding `--host 0.0.0.0` exposes the workbench to the network. The server has no
+multi-user authentication; in a shared environment keep it bound to localhost or
+a trusted tunnel, and follow the bind/security and deployment notes in
+[DEPLOYMENT.md](DEPLOYMENT.md).
+
+When the service runs on a compute node, create a local tunnel using the
+deployment profile rather than recording the host in Git:
 
 ```bash
 ssh -N -L 8888:<compute-node>:<service-port> <ssh-profile>
@@ -30,50 +37,47 @@ Open `http://localhost:8888` and verify:
 
 ```bash
 curl -fsS http://localhost:8888/healthz
-curl -fsS http://localhost:8888/api/demo/cases
+curl -fsS http://localhost:8888/api/capabilities
 ```
 
-The health response must report the service, Evidence Store, cache and executor as available. The demo catalog should mark the required stored cases as `available`.
+The health response must report the service, Evidence Store, cache and executor
+as available. The capability pill shows which optional scientific backends are
+installed in this environment.
 
-## Presentation path
+## Presentation path (live project)
 
-### 0:00–0:35 — Product position
+1. **Create or open a project.** Use the workbench “新建项目” panel (or
+   `target-agent ask` / `target-agent init` + `project-run`), then open it in
+   the workbench. Explain that the product is a research Agent, not a gene-list
+   generator, and that the frontend renders only stored backend evidence.
+2. **Plan and checkpoints.** Show the typed plan (bound to the executable
+   workflow template), the Planner backend, and the checkpointed approval loop
+   in the “研究会话” panel (researcher / reviewer / admin roles; viewer is
+   read-only).
+3. **Evidence and ranking.** Show results, branch/rollback history, events,
+   artifacts and the evidence graphs. Keep the boundaries explicit:
+   `FACT` / `OBSERVED` / `PREDICTED` / `INFERRED` remain separate; a priority
+   score is not a clinical success probability; missing context degrades
+   honestly (`completed_with_gaps`) instead of being fabricated.
+4. **Offline review fallback.** While the live project runs (or after it
+   completes), render the single-file offline review page:
 
-Explain that the product is a research Agent, not a gene-list generator. Point to the six-stage pipeline and the statement that the frontend renders only stored backend evidence.
+   ```bash
+   target-agent share --project-id project-xxx --output project-xxx.html
+   target-agent share --input project-xxx.target-project.zip --output project-xxx.html
+   ```
 
-### 0:35–1:15 — Stable LUAD replay
-
-Click **肺腺癌靶点发现 → 加载并回放**. State clearly that this is an acceptance-checked stored Trace replay. Show:
-
-- the typed 12-step Plan;
-- the actual Planner backend used by that stored run;
-- 33 Trace events and nine covered tools;
-- dynamic GEO screening, with GSE310170 selected and rejected datasets retaining their reasons.
-
-### 1:15–2:20 — Evidence and ranking
-
-Scroll to evidence fusion and the top-10 ranking. Explain:
-
-- `FACT`, `OBSERVED`, `PREDICTED` and `INFERRED` remain separate;
-- a priority score is not a clinical success probability;
-- BIRC3 and CEMIP2 have omics-only support and remain `INSUFFICIENT_EVIDENCE`;
-- EGFR is `CONDITIONAL_GO`, not unconditional `GO`.
-
-### 2:20–3:30 — TargetCard and falsifiable experiment
-
-Show the EGFR, TP63 and NRG1 cards. For EGFR, point out the retained safety liabilities, known drugs, matched-context perturbation gap and highest-information experiment. Explain what positive, negative and contradictory results would imply.
-
-### 3:30–4:20 — Reliable degradation
-
-Click **UC可靠降级 → 加载并回放**. Show `COMPLETED WITH GAPS`, `not_covered` and `context_mismatch`. Explain that the Agent continues available aggregate associations, literature and drug evidence while refusing to fabricate strict genetics or formal omics evidence without controlled inputs.
-
-### 4:20–5:00 — Generalization and optional live action
-
-Point to the Alzheimer disease stored case as cross-disease evidence. Expand **启动新的真实运行** only if network time permits. A live run is optional; the acceptance-checked replay demonstrates the auditable product path but is not a biological validation result.
+   The generated HTML has no backend, network or external resources; it embeds
+   a SHA-256 snapshot fingerprint and is scrubbed of secrets. Present it as a
+   review snapshot of one project state, never as a live backend session.
 
 ## Recovery during a presentation
 
-- If a live run is slow, return to an acceptance-checked stored case; do not wait on public databases.
-- If Step is unavailable, the generic deterministic workflow remains available and the Planner backend is shown.
-- If a backend capability is missing, use the capability pill and Reviewer findings to explain the gap.
-- If the service cannot be reached, use the separately generated offline HTML/video package. Do not present it as a live backend session.
+- If a live run is slow, switch to an existing completed project or the offline
+  review page; do not wait on public databases.
+- If Step is unavailable, the deterministic workflow remains available and the
+  Planner backend is shown.
+- If a backend capability is missing, use the capability pill and Reviewer
+  findings to explain the gap.
+- If the service cannot be reached, open the offline review page; do not
+  present it as a live backend session.

@@ -10,11 +10,13 @@ executions and are reaped when idle.
 """
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -53,6 +55,10 @@ class KernelDisabledError(KernelError):
 
 
 class KernelNotConfiguredError(KernelError):
+    pass
+
+
+class KernelForbiddenError(KernelError):
     pass
 
 
@@ -552,11 +558,29 @@ class KernelManager:
     def _new_id(self) -> str:
         return f"kernel-{uuid.uuid4().hex[:20]}"
 
+    def _allowed_cwd_roots(self) -> list[Path]:
+        roots = [
+            self._settings.projects_dir,
+            self._settings.runs_dir,
+            self._settings.cache_dir,
+            self._settings.input_root,
+        ]
+        resolved = [root.expanduser().resolve() for root in roots]
+        resolved.append(Path(tempfile.gettempdir()).resolve())
+        return resolved
+
+    def _is_allowed_cwd(self, path: Path) -> bool:
+        return any(path == root or root in path.parents for root in self._allowed_cwd_roots())
+
     def create(self, language: str = "python", cwd: str | Path | None = None) -> KernelInfo:
         if not self.enabled:
             raise KernelDisabledError("kernel execution is disabled by TARGET_AGENT_KERNEL_ENABLED=false")
         lang = KernelLanguage(language.lower())
         workdir = Path(cwd or self._settings.projects_dir).expanduser().resolve()
+        # Reject out-of-whitelist cwds before creating anything, so a hostile
+        # request cannot cause directories to be created outside managed roots.
+        if not self._is_allowed_cwd(workdir):
+            raise KernelForbiddenError("kernel cwd must be inside a managed data directory")
         if cwd is None:
             # Default projects dir is a managed data directory: create it on demand.
             workdir.mkdir(parents=True, exist_ok=True)
@@ -680,6 +704,19 @@ class _DaemonHandler(BaseHTTPRequestHandler):
     """JSON kernel daemon routes shared by CLI subprocesses."""
 
     manager: KernelManager | None = None
+    token: str | None = None
+
+    def _authorized(self) -> bool:
+        if not self.token:
+            return True
+        presented = self.headers.get("X-Kernel-Token") or ""
+        if not presented:
+            header = self.headers.get("Authorization", "")
+            scheme, _, value = header.partition(" ")
+            presented = value.strip() if scheme.lower() == "bearer" else ""
+        return bool(presented) and hmac.compare_digest(
+            presented.encode("utf-8"), self.token.encode("utf-8")
+        )
 
     def log_message(self, format: str, *args: Any) -> None:
         return
@@ -704,6 +741,9 @@ class _DaemonHandler(BaseHTTPRequestHandler):
         return payload if isinstance(payload, dict) else {}
 
     def do_GET(self) -> None:
+        if not self._authorized():
+            self._send(401, {"error": "unauthorized", "detail": "kernel token required"})
+            return
         if self.path == "/healthz":
             self._send(200, {"status": "ok"})
             return
@@ -724,6 +764,9 @@ class _DaemonHandler(BaseHTTPRequestHandler):
         self._send(404, {"error": "not_found"})
 
     def do_POST(self) -> None:
+        if not self._authorized():
+            self._send(401, {"error": "unauthorized", "detail": "kernel token required"})
+            return
         body = self._read_json()
         if self.path == "/api/kernels":
             try:
@@ -733,6 +776,9 @@ class _DaemonHandler(BaseHTTPRequestHandler):
                 )
             except (KernelDisabledError, KernelNotConfiguredError, KernelConfigError) as exc:
                 self._send(400, {"error": exc.__class__.__name__, "detail": str(exc)})
+                return
+            except KernelForbiddenError as exc:
+                self._send(403, {"error": exc.__class__.__name__, "detail": str(exc)})
                 return
             self._send(201, info.to_dict())
             return
@@ -783,6 +829,9 @@ class KernelDaemon:
         from http.server import ThreadingHTTPServer
 
         _DaemonHandler.manager = self.manager
+        _DaemonHandler.token = (
+            self.settings.kernel_token.get_secret_value() if self.settings.kernel_token else None
+        )
         server = ThreadingHTTPServer((host, port or self.settings.kernel_port), _DaemonHandler)
         server.daemon_threads = True
         try:
@@ -796,9 +845,11 @@ def daemon_base_url(settings: Settings) -> str:
     return f"http://127.0.0.1:{settings.kernel_port}"
 
 
-def daemon_health(base_url: str, timeout: float = 0.5) -> bool:
+def daemon_health(base_url: str, timeout: float = 0.5, token: str | None = None) -> bool:
+    headers = {"X-Kernel-Token": token} if token else {}
     try:
-        with urllib.request.urlopen(f"{base_url}/healthz", timeout=timeout) as response:
+        request = urllib.request.Request(f"{base_url}/healthz", headers=headers)
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.status == 200
     except OSError:
         return False
@@ -807,7 +858,8 @@ def daemon_health(base_url: str, timeout: float = 0.5) -> bool:
 def ensure_kernel_daemon(settings: Settings) -> str:
     """Return a healthy daemon base URL, starting a detached daemon if needed."""
     base_url = daemon_base_url(settings)
-    if daemon_health(base_url):
+    token = settings.kernel_token.get_secret_value() if settings.kernel_token else None
+    if daemon_health(base_url, token=token):
         return base_url
     log_path = settings.cache_dir / "kernel-daemon.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -826,7 +878,7 @@ def ensure_kernel_daemon(settings: Settings) -> str:
         )
     deadline = time.monotonic() + 8.0
     while time.monotonic() < deadline:
-        if daemon_health(base_url):
+        if daemon_health(base_url, token=token):
             return base_url
         if proc.poll() is not None:
             break
@@ -847,6 +899,11 @@ class KernelDaemonClient:
               timeout: float = 90.0) -> tuple[int, dict[str, Any]]:
         data = None
         headers = {}
+        token = self.settings.kernel_token
+        if token is not None:
+            secret = token.get_secret_value()
+            if secret:
+                headers["X-Kernel-Token"] = secret
         if payload is not None:
             data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             headers["Content-Type"] = "application/json"
@@ -902,7 +959,8 @@ class KernelDaemonClient:
 
 __all__ = [
     "KernelConfigError", "KernelDisabledError", "KernelError", "KernelExecResult",
-    "KernelInfo", "KernelLanguage", "KernelManager", "KernelNotConfiguredError",
+    "KernelForbiddenError", "KernelInfo", "KernelLanguage", "KernelManager",
+    "KernelNotConfiguredError",
     "KernelNotFoundError", "KernelStatus", "KernelTimeoutError", "KernelUnavailableError",
     "KernelDaemon", "KernelDaemonClient", "daemon_base_url", "daemon_health",
     "ensure_kernel_daemon",

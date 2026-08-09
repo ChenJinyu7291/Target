@@ -1,13 +1,14 @@
 """Transparent six-dimensional ranking; total score is never a success probability."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from .contracts import (
     ClaimClass, EvidenceItem, ReviewerFinding, ScoreBreakdown, Stance,
-    TargetGeneticEvidenceSummary, ToolResult,
+    TargetGeneticEvidenceSummary, TaskContext, TerminalStatus, ToolResult,
 )
+from .context_score import evidence_context_score
 
 
 WEIGHTS = {
@@ -32,6 +33,8 @@ class RankedTarget:
     matched_drugs: list[dict[str, Any]]
     genetic_evidence_summary: list[TargetGeneticEvidenceSummary]
     decision: str
+    context_score_origin: str = "recomputed"
+    context_score_notes: list[str] = field(default_factory=list)
 
 
 def _clamp(value: float, high: float) -> float:
@@ -51,10 +54,34 @@ def _phase_value(value: Any) -> float:
     return 0.0
 
 
+
+def _directional_supported_literature(item: EvidenceItem) -> bool:
+    """FACT/stronger literature counts only when it is directional, non-co-mention,
+    and its source version/checksum is verifiable (P1-2/P1-4)."""
+    if item.claim_class not in {ClaimClass.FACT, ClaimClass.OBSERVED}:
+        return False
+    if "europepmc" not in item.source.uri.lower():
+        return False
+    if "provenance_missing" in item.quality_flags:
+        return False
+    if "co-mentions" in item.statement.lower():
+        return False
+    if item.effect_direction not in {"increase", "decrease"} or item.stance != Stance.SUPPORTS:
+        return False
+    if not item.source.version:
+        return False
+    if item.source.version.startswith("shared-corpus"):
+        return bool(item.source.sha256 or (item.source.version_meta or {}).get("corpus_snapshot_sha256"))
+    return True
+
+
 def rank_targets(
     candidates: list[str], evidence: list[EvidenceItem], results: list[ToolResult],
     findings: list[ReviewerFinding] | None = None,
-    *, minimum_coloc_pp4: float = 0.8,
+    *,
+    minimum_coloc_pp4: float = 0.8,
+    task_context: TaskContext | None = None,
+    terminal_status: TerminalStatus | None = None,
 ) -> list[RankedTarget]:
     results_by_id = {result.tool_run_id: result for result in results}
 
@@ -88,7 +115,9 @@ def rank_targets(
     ranked = []
     for gene in candidates:
         items = by_gene[gene]
-        formal = [item for item in items if item.context_match_score >= 0.5]
+        scored = [(evidence_context_score(item, task_context), item) for item in items]
+        context_by_id = {item.evidence_id: score for score, item in scored}
+        formal = [item for score, item in scored if score.score >= 0.5]
         genetics = 0.0
         omics = 0.0
         perturb = 0.0
@@ -104,7 +133,7 @@ def rank_targets(
         independent_genetic_context: dict[tuple[str, str], float] = {}
 
         for item in formal:
-            context = item.context_match_score
+            context = context_by_id[item.evidence_id].score
             genetic = item.genetic_evidence
             if (
                 genetic is not None
@@ -152,7 +181,7 @@ def rank_targets(
 
         has_omics = any("legacy_disease_strength_0_60" in item.effect or "omics_strength" in item.effect for item in formal)
         has_observed_perturb = any(item.claim_class == ClaimClass.OBSERVED and "disease_alignment" in item.effect for item in formal)
-        has_literature = any(item.claim_class == ClaimClass.FACT and "europepmc" in item.source.uri.lower() for item in formal)
+        has_literature = any(_directional_supported_literature(item) for item in formal)
         if has_omics and has_observed_perturb:
             mechanism += 8.0
         if has_literature:
@@ -199,6 +228,12 @@ def rank_targets(
                 "Unresolved Reviewer finding(s) affect this target: " + ", ".join(categories) + "."
             )
             gaps.append("Resolve the linked blocking/major Reviewer findings before an unconditional GO.")
+        global_block = terminal_status is not None and terminal_status != TerminalStatus.COMPLETED
+        if global_block:
+            blockers.append(
+                "Terminal status is not COMPLETED; unconditional GO is globally forbidden while unresolved gaps remain."
+            )
+            gaps.append("Terminal status carries unresolved gaps; resolve findings before an unconditional GO.")
 
         scores = ScoreBreakdown(
             human_genetics=_clamp(genetics, 25), disease_omics=_clamp(omics, 20),
@@ -221,6 +256,10 @@ def rank_targets(
             supporting_ids=supporting, opposing_ids=opposing, safety_blockers=blockers,
             evidence_gaps=gaps, matched_drugs=matched_drugs, decision=decision,
             genetic_evidence_summary=genetic_summaries,
+            context_score_origin=(
+                "recomputed" if task_context is not None else "recomputed_against_evidence_context"
+            ),
+            context_score_notes=sorted({note for score, _ in scored for note in score.notes}),
         ))
     ranked.sort(key=lambda row: (-row.scores.total, row.gene))
     return ranked

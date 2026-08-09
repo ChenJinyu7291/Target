@@ -10,12 +10,12 @@
 | SciForge | 科研 Agent 的人类控制面与证据层 | 干预面板、Evidence/Project DAG、跨会话长期工作区、人类审批节点 | 已有 checkpoint/repair/fork 审批；缺证据图可视化与长期工作区文件浏览 |
 | OpenScience | 本地科研工作台（单二进制） | 开箱即用、模型供应商路由、290+ Skills 渐进加载、浏览器工作区（文件树/编辑器/终端）、最终 blind reviewer 门、OpenAPI SDK | 有模型（仅 Step）、工具注册表、Web 工作台雏形；缺供应商抽象、Skills 目录化、导出包 |
 | OpenAI4S | JSON 编排 + 持久 Python/R 内核双平面 | Action Ledger、plan/review 状态机、持久内核、版本化产物、会话分享包、doctor/诊断 | 有 Ledger/计划/评审/产物；缺持久内核与会话分享包 |
-| Wisp Science | local-first 科研工作台 | 本地/SSH/GPU 执行上下文、OS keyring 密钥、MCP 数据库连接器、Skills 渐进披露 | 有远程执行 profile；密钥仍在 .env；MCP 仅 stdio 自有工具 |
+| Wisp Science | local-first 科研工作台 | 本地/SSH/GPU 执行上下文、OS keyring 密钥、MCP 数据库连接器、Skills 渐进披露 | 有远程执行 profile 与 OS keyring；MCP stdio + Streamable HTTP 基础（认证/多租户未完成） |
 
 ## 2. 目标架构（产品化后的 Target）
 
 ```text
-用户入口：CLI（target-agent） / Web 工作台 / HTTP API / stdio MCP
+用户入口：CLI（target-agent） / Web 工作台 / HTTP API / MCP（stdio + Streamable HTTP 基础）
         ↓
 产品控制面：项目生命周期（init → plan → approve → execute → review → release）
         ├─ 任意步骤回退（redo / restore / fork 审批）
@@ -66,7 +66,7 @@
 ### P2：平台化
 
 - 认证、多租户、资源配额与观测
-- Streamable HTTP MCP 与连接器 SDK
+- 连接器 SDK（Streamable HTTP MCP 基础已完成；认证/多租户/配额未完成）
 - 会话/项目分享包（借鉴 OpenAI4S read-only share）
 - OS keyring 密钥管理（借鉴 Wisp）
 

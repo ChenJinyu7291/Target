@@ -13,12 +13,14 @@ services:
       STEP_MODEL: ${STEP_MODEL:-step-3.7-flash}
       NCBI_API_KEY: ${NCBI_API_KEY:-}
       NCBI_EMAIL: ${NCBI_EMAIL:-}
+      TARGET_AGENT_WEB_TOKEN: ${TARGET_AGENT_WEB_TOKEN:-}
+      TARGET_AGENT_KERNEL_TOKEN: ${TARGET_AGENT_KERNEL_TOKEN:-}
       RESEARCH_AGENT_PROJECT_DIR: /data/projects
       TARGET_AGENT_RUN_DIR: /data/runs
       TARGET_AGENT_CACHE_DIR: /data/cache
       TARGET_AGENT_INPUT_ROOT: /data/input
     ports:
-      - "${TARGET_PORT:-8888}:8888"
+      - "127.0.0.1:${TARGET_PORT:-8888}:8888"
     volumes:
       - target-data:/data
     healthcheck:

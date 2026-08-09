@@ -20,7 +20,12 @@ from .paper_strategy import PatternStore
 from .planner import Planner
 from .research_contracts import ResearchProjectSpec
 from .research_runtime import ResearchProjectRuntime
-from .research_service import ResearchProjectService
+from .research_service import (
+    ResearchDecisionError,
+    ResearchProjectNotFound,
+    ResearchProjectService,
+)
+from .research_session import ResearchSessionService
 from .runtime import TargetDiscoveryRuntime
 from .runtime_langgraph import LangGraphRuntime
 from .schema_export import export_schemas
@@ -37,6 +42,25 @@ def load_task(path: Path) -> TaskSpec:
 def load_research_project(path: Path) -> ResearchProjectSpec:
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     return ResearchProjectSpec.model_validate(payload)
+
+
+def _error_exit(exc: Exception) -> None:
+    """Print a JSON error payload and exit non-zero (thin CLI adapter contract)."""
+    print(json.dumps({"error": str(exc)}, ensure_ascii=False))
+    raise SystemExit(1) from exc
+
+
+def _parse_json_overrides(raw: str | None) -> dict | None:
+    """Parse an optional --input-overrides JSON object into a dict."""
+    if raw is None or not raw.strip():
+        return None
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError("input_overrides must be valid JSON") from exc
+    if not isinstance(value, dict):
+        raise ValueError("input_overrides must be a JSON object")
+    return value
 
 
 def _init_readme(spec: ResearchProjectSpec) -> str:
@@ -193,6 +217,67 @@ def main() -> None:
     repair_decision.add_argument("--rationale", required=True)
     repair_decision.add_argument("--projects-dir", type=Path)
     repair_decision.add_argument("--resume", action="store_true")
+
+    project_branches = sub.add_parser("project-branches", help="Read the fork branch history and immutable directives for a project")
+    project_branches.add_argument("--project-id", required=True)
+    project_branches.add_argument("--projects-dir", type=Path)
+
+    fork_propose = sub.add_parser("project-fork-propose", help="Propose a snapshot-bound redo/restore rollback branch")
+    fork_propose.add_argument("--project-id", required=True)
+    fork_propose.add_argument("--target-work-item-id", required=True)
+    fork_propose.add_argument("--mode", choices=["redo", "restore"], required=True)
+    fork_propose.add_argument("--rationale", required=True)
+    fork_propose.add_argument("--actor", required=True)
+    fork_propose.add_argument("--rollback-to-attempt-id", help="Historical attempt to restore (restore mode only)")
+    fork_propose.add_argument("--input-overrides", help="JSON object of per-work-item input overrides")
+    fork_propose.add_argument("--projects-dir", type=Path)
+
+    fork_decision = sub.add_parser("project-fork-decision", help="Approve or reject one immutable fork branch snapshot")
+    fork_decision.add_argument("--project-id", required=True)
+    fork_decision.add_argument("--branch-id", required=True)
+    fork_decision.add_argument("--approve", action=argparse.BooleanOptionalAction, required=True)
+    fork_decision.add_argument("--actor", required=True)
+    fork_decision.add_argument("--rationale", required=True)
+    fork_decision.add_argument("--projects-dir", type=Path)
+    fork_decision.add_argument("--resume", action="store_true",
+                               help="Resume the project immediately after recording the decision")
+
+    session_cmd = sub.add_parser("session", help="Manage role-aware research sessions over one durable project")
+    session_sub = session_cmd.add_subparsers(dest="session_command", required=True)
+    session_create = session_sub.add_parser("create", help="Create a conversation view over one durable project")
+    session_create.add_argument("--project-id", required=True)
+    session_create.add_argument("--title", help="Session title")
+    session_create.add_argument("--role", choices=["researcher", "reviewer", "admin", "viewer"], default="researcher")
+    session_create.add_argument("--projects-dir", type=Path)
+    session_list = session_sub.add_parser("list", help="List sessions and their message counts for one project")
+    session_list.add_argument("--project-id", required=True)
+    session_list.add_argument("--projects-dir", type=Path)
+    session_read = session_sub.add_parser("read", help="Read all messages of one session")
+    session_read.add_argument("--project-id", required=True)
+    session_read.add_argument("--session-id", required=True)
+    session_read.add_argument("--projects-dir", type=Path)
+    session_post = session_sub.add_parser("post", help="Append a user message to one session")
+    session_post.add_argument("--project-id", required=True)
+    session_post.add_argument("--session-id", required=True)
+    session_post.add_argument("--text", required=True)
+    session_post.add_argument("--ask-agent", action="store_true",
+                              help="Return a deterministic snapshot summary without mutating science state")
+    session_post.add_argument("--actor", default="researcher")
+    session_post.add_argument("--projects-dir", type=Path)
+    session_intervene = session_sub.add_parser("intervene", help="Execute one structured control-plane action from inside a session")
+    session_intervene.add_argument("--project-id", required=True)
+    session_intervene.add_argument("--session-id", required=True)
+    session_intervene.add_argument("--action", choices=["accept_checkpoint", "decide_repair", "decide_fork", "propose_fork"], required=True)
+    session_intervene.add_argument("--rationale", required=True)
+    session_intervene.add_argument("--actor", default="researcher")
+    session_intervene.add_argument("--target-id", help="Plan/work-item/repair/branch id required by the action")
+    session_intervene.add_argument("--approve", action=argparse.BooleanOptionalAction,
+                                  help="Approve or reject a decide_repair/decide_fork action")
+    session_intervene.add_argument("--snapshot-digest", help="Exact repair snapshot digest (decide_repair only)")
+    session_intervene.add_argument("--mode", choices=["redo", "restore"], help="Fork mode (propose_fork only)")
+    session_intervene.add_argument("--rollback-to-attempt-id", help="Historical attempt to restore (propose_fork restore only)")
+    session_intervene.add_argument("--input-overrides", help="JSON object of per-work-item input overrides (propose_fork only)")
+    session_intervene.add_argument("--projects-dir", type=Path)
 
     schemas = sub.add_parser("export-schemas", help="Export canonical Pydantic JSON Schemas")
     schemas.add_argument("--output", type=Path, default=Path("schemas"))
@@ -443,6 +528,73 @@ def main() -> None:
             rationale=args.rationale,
             resume=args.resume,
         )
+    elif args.command == "project-branches":
+        runtime = ResearchProjectRuntime(projects_dir=args.projects_dir, settings=settings)
+        try:
+            result = ResearchProjectService(runtime).branches(args.project_id)
+        except (ResearchProjectNotFound, ResearchDecisionError, ValueError) as exc:
+            _error_exit(exc)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    elif args.command == "project-fork-propose":
+        runtime = ResearchProjectRuntime(projects_dir=args.projects_dir, settings=settings)
+        try:
+            result = ResearchProjectService(runtime).propose_fork(
+                project_id=args.project_id,
+                target_work_item_id=args.target_work_item_id,
+                mode=args.mode,
+                rationale=args.rationale,
+                actor=args.actor,
+                rollback_to_attempt_id=args.rollback_to_attempt_id,
+                input_overrides=_parse_json_overrides(args.input_overrides),
+            )
+        except (ResearchProjectNotFound, ResearchDecisionError, ValueError) as exc:
+            _error_exit(exc)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    elif args.command == "project-fork-decision":
+        runtime = ResearchProjectRuntime(projects_dir=args.projects_dir, settings=settings)
+        try:
+            result = ResearchProjectService(runtime).decide_fork(
+                project_id=args.project_id,
+                branch_id=args.branch_id,
+                approve=args.approve,
+                actor=args.actor,
+                rationale=args.rationale,
+                resume=args.resume,
+            )
+        except (ResearchProjectNotFound, ResearchDecisionError, ValueError) as exc:
+            _error_exit(exc)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    elif args.command == "session":
+        runtime = ResearchProjectRuntime(projects_dir=args.projects_dir, settings=settings)
+        sessions = ResearchSessionService(runtime)
+        try:
+            if args.session_command == "create":
+                result = sessions.create(args.project_id, title=args.title, role=args.role)
+            elif args.session_command == "list":
+                result = sessions.list(args.project_id)
+            elif args.session_command == "read":
+                result = sessions.messages(args.project_id, args.session_id)
+            elif args.session_command == "post":
+                result = sessions.post_message(
+                    args.project_id, args.session_id, args.text,
+                    ask_agent=args.ask_agent, actor=args.actor,
+                )
+            else:
+                result = sessions.intervene(
+                    project_id=args.project_id,
+                    session_id=args.session_id,
+                    action=args.action,
+                    rationale=args.rationale,
+                    actor=args.actor,
+                    target_id=args.target_id,
+                    approve=args.approve,
+                    snapshot_digest=args.snapshot_digest,
+                    mode=args.mode,
+                    rollback_to_attempt_id=args.rollback_to_attempt_id,
+                    input_overrides=_parse_json_overrides(args.input_overrides),
+                )
+        except (ResearchProjectNotFound, ResearchDecisionError, ValueError) as exc:
+            _error_exit(exc)
         print(json.dumps(result, indent=2, ensure_ascii=False))
     elif args.command == "export-schemas":
         for path in export_schemas(args.output):
@@ -748,8 +900,6 @@ def main() -> None:
                 indent=2, ensure_ascii=False), encoding="utf-8")
             print(f"summary written to {args.summary_out}")
     elif args.command == "workflows":
-        from .research_service import ResearchProjectService
-        from .research_runtime import ResearchProjectRuntime
         from .workflow_catalog import WorkflowCatalogError
 
         service = ResearchProjectService(ResearchProjectRuntime(settings=settings))

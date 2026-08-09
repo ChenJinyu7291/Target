@@ -33,7 +33,7 @@ curl http://localhost:8888/healthz
 curl http://localhost:8888/api/capabilities
 ```
 
-- 端口可用 `TARGET_PORT` 覆盖（默认 8888）。
+- 端口可用 `TARGET_PORT` 覆盖（默认 8888）；Compose 默认只绑定 `127.0.0.1`，远程访问前请先阅读“安全部署清单”。
 - 持久化：命名卷 `target-data` 挂载到容器 `/data`，项目/运行/缓存/输入分别落在 `/data/projects|runs|cache|input`，重建容器不丢数据。
 - 停止/升级：
   ```bash
@@ -65,6 +65,8 @@ singularity exec instance://target-agent target-agent serve --host 0.0.0.0 --por
 - 环境变量通过 `SINGULARITYENV_STEP_API_KEY=...` 注入（密钥仍在容器外）。
 - PBS 作业里把 `singularity run target.sif ...` 作为作业命令即可在计算节点执行；数据目录建议放在共享文件系统。
 
+> ⚠️ 安全提示：容器内 CMD 仍监听 `0.0.0.0`（Docker 端口发布需要）；Compose 默认只绑定到宿主机 `127.0.0.1`。任何远程暴露（公网、跨网络共享）必须先设置 `TARGET_AGENT_WEB_TOKEN`，或将服务置于带认证与 TLS 的反向代理之后。
+
 ## 4. 数据与密钥约定
 
 | 项 | 约定 |
@@ -87,7 +89,17 @@ target-agent project-package-inspect --input 任意已导出包   # 包完整性
 
 Docker 环境健康检查失败时先看 `docker compose logs target-agent`；常见原因是端口被占用、`.env` 中密钥格式错误或 /data 权限不足。
 
-## 6. 边界
+## 6. 安全部署清单
+
+远程或多人使用前，逐项确认：
+
+- 绑定：本机与 Compose 默认只监听 `127.0.0.1`；不要把 8888 直接发布到公网或非受信网络。
+- 令牌：任何远程暴露都必须设置 `TARGET_AGENT_WEB_TOKEN`；启用后除 `/healthz` 外所有 `/api/*` 都需要 `Authorization: Bearer <token>`。
+- 反向代理：若经反向代理提供访问，代理必须负责认证与 TLS，且不要把 `/api/*` 透传给未认证客户端。
+- 网络隔离：Web 端口与 kernel daemon 端口（默认 8765）只对受信主机开放；kernel daemon 仅监听本机回环。
+- Kernel 令牌：多用户主机建议设置 `TARGET_AGENT_KERNEL_TOKEN`；daemon 请求需携带 `X-Kernel-Token` 或 `Authorization: Bearer <token>`。
+
+## 7. 边界
 
 - 当前为单租户部署；多用户认证、配额与租户隔离按“真实多用户部署需要时”再实施（P2.19 后半）。
 - 容器默认不含 R/limma 后端与训练依赖；需要时用 `TARGET_EXTRAS` 或单独镜像扩展。

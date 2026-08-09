@@ -445,3 +445,65 @@ def test_lease_heartbeat_refreshes_expiry(tmp_path):
     assert refreshed.heartbeat_at >= lease.heartbeat_at
     store.release_lease(lease.lease_id)
     assert store.heartbeat_lease(lease.lease_id).released_at is not None
+
+def test_event_ledger_append_is_contiguous_and_incrementally_readable(tmp_path):
+    store = initialized_store(tmp_path)
+    events = [store.append_event(f"event_{i}", "running") for i in range(5)]
+    assert [row.sequence for row in events] == [1, 2, 3, 4, 5]
+    assert store.count_events() == 5
+    assert [row.sequence for row in store.read_events(after_sequence=2)] == [3, 4, 5]
+    assert [row.sequence for row in store.read_events(after_sequence=2, limit=2)] == [3, 4]
+    with pytest.raises(ValueError, match="after_sequence"):
+        store.read_events(after_sequence=-1)
+    with pytest.raises(ValueError, match="limit"):
+        store.read_events(limit=0)
+    # A fresh store instance observes exactly the same ledger, so the
+    # process-local tail cursor never drifts from the durable file.
+    fresh = ResearchProjectStore(store.projects_dir, store.project_id)
+    assert [row.sequence for row in fresh.read_events()] == [1, 2, 3, 4, 5]
+    assert fresh.count_events() == 5
+
+
+def test_domain_activity_appends_use_tail_cursor_and_stay_contiguous(tmp_path):
+    store = initialized_store(tmp_path)
+    descriptors = [ToolDescriptor(
+        tool_id="europe_pmc_rag",
+        evidence_dimension="literature",
+        description="Literature retrieval and grounded extraction.",
+    )]
+
+    def projection_for(event_id: str, run_id: str):
+        return project_trace_event(
+            project_id=store.project_id,
+            work_item_id="literature",
+            child_run_id=run_id,
+            event=TraceEvent(
+                event_id=event_id,
+                run_id=run_id,
+                task_id=f"task-{run_id}",
+                event_type="tool_result",
+                state="tool_execution",
+                detail={
+                    "tool": "europe_pmc_rag",
+                    "status": "partial",
+                    "coverage_status": "partial",
+                    "context_match_score": 0.8,
+                },
+                related_ids=["tool-cursor"],
+                created_at="2026-01-01T00:00:00Z",
+            ),
+            descriptors=descriptors,
+        )
+
+    first = store.append_domain_activity(projection_for("trace-cursor-1", "run-cursor-1"))
+    assert first.sequence == 1
+    assert store.append_domain_activity(
+        projection_for("trace-cursor-1", "run-cursor-1")
+    ) == first
+    second = store.append_domain_activity(projection_for("trace-cursor-2", "run-cursor-2"))
+    assert second.sequence == 2
+    assert store.domain_activity_cursor() == 2
+    assert [row.sequence for row in store.read_domain_activities()] == [1, 2]
+    # A fresh store instance observes the same durable ledger.
+    fresh = ResearchProjectStore(store.projects_dir, store.project_id)
+    assert [row.sequence for row in fresh.read_domain_activities()] == [1, 2]

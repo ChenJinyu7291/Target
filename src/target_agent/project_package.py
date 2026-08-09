@@ -9,6 +9,7 @@ Rules:
 - files whose names look like secrets abort the export;
 - an import never overwrites an existing project directory;
 - every manifest-listed file is hash-verified before extraction is committed;
+- archive members not listed in the manifest are rejected;
 - project_spec.json must parse as ResearchProjectSpec before acceptance.
 """
 from __future__ import annotations
@@ -63,6 +64,15 @@ def _sha256_file(path: Path) -> tuple[str, int]:
             digest.update(chunk)
             size += len(chunk)
     return digest.hexdigest(), size
+
+
+def _sha256_zip_member(archive: zipfile.ZipFile, member: str) -> str:
+    digest = hashlib.sha256()
+    with archive.open(member, "r") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
 
 
 def _iter_project_files(project_dir: Path) -> list[Path]:
@@ -196,11 +206,24 @@ def import_project(projects_dir: Path | str, archive: Path) -> dict:
         by_path = {entry.path: entry for entry in manifest.files}
         if "project_spec.json" not in by_path:
             raise ValueError("manifest does not list project_spec.json")
+        member_set = set(names)
+        manifest_paths = {_safe_member(entry.path) for entry in manifest.files}
+        unlisted = [
+            member for member in names
+            if member not in manifest_paths and member not in {"MANIFEST.json", "README.txt"}
+        ]
+        if unlisted:
+            raise ValueError(
+                f"package contains member not listed in manifest: {unlisted[0]}"
+            )
+        for member in names:
+            if _SECRET_RE.search(member):
+                raise ValueError(f"package contains secret-like file: {member}")
         for entry in manifest.files:
             member = _safe_member(entry.path)
-            if member not in names:
+            if member not in member_set:
                 raise ValueError(f"manifest file missing from archive: {entry.path}")
-            digest = hashlib.sha256(zf.read(member)).hexdigest()
+            digest = _sha256_zip_member(zf, member)
             if digest != entry.sha256:
                 raise ValueError(f"checksum mismatch for {entry.path}")
         temp_dir = Path(tempfile.mkdtemp(prefix=f".import-{project_id}-", dir=projects_root))
@@ -224,7 +247,7 @@ def import_project(projects_dir: Path | str, archive: Path) -> dict:
                 raise ValueError(f"package contains secret-like file: {rel}")
         import_record = {
             "imported_at": datetime.now(timezone.utc).isoformat(),
-            "source_archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+            "source_archive_sha256": _sha256_file(archive)[0],
             "package_schema_version": manifest.schema_version,
         }
         (temp_dir / "import_record.json").write_text(

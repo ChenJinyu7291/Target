@@ -12,8 +12,9 @@ from target_agent.research_contracts import (
     AssessmentDimension, AssessmentLevel, AssessmentRecord, AssessmentResult, AutonomyMode,
     DecisionAction, DecisionEvent, FailureClass, ProjectState, ProjectStatus,
     RepairResolutionStatus, ResearchGoal,
-    ResearchProjectSpec,
-    WorkAttempt, WorkAttemptStatus, WorkItemHead, WorkItemResult, WorkItemStatus, WorkerLease,
+    ResearchPlan, ResearchPlanRevision, ResearchProjectSpec,
+    WorkAttempt, WorkAttemptStatus, WorkItemHead, WorkItemResult, WorkItemSpec, WorkItemStatus,
+    WorkerLease,
 )
 from target_agent.research_modules import (
     ModuleDescriptor,
@@ -169,7 +170,7 @@ class FakeResearchModule:
                     dimension=AssessmentDimension.METHODOLOGY,
                     level=AssessmentLevel.A0,
                     result=(AssessmentResult.FAIL if item_id in blocking else AssessmentResult.PASS),
-                    actor="fake_independent_review",
+                    actor="independent_review",
                     method="typed_status_gate",
                     rationale=f"Observed {result.status.value}.",
                     blocking=item_id in blocking,
@@ -193,7 +194,7 @@ class FakeResearchModule:
                             dimension=AssessmentDimension.METHODOLOGY,
                             level=AssessmentLevel.A0,
                             result=AssessmentResult.FAIL,
-                            actor="fake_independent_review",
+                            actor="independent_review",
                             method="typed_dataset_gate",
                             rationale="Preferred dataset rejected; same-context repair is eligible.",
                             blocking=True,
@@ -1064,3 +1065,79 @@ def test_review_target_recorded_and_reconciled_after_interruption(tmp_path):
     assert targets[0].snapshot_digest == expected_digest
     assert calls == Counter({name: 1 for name in BASELINE_MODULES})
     store.assert_integrity()
+
+def test_run_records_structured_worker_failure_and_continues(tmp_path):
+    runtime, _ = fake_research_runtime(tmp_path)
+    project = research_project("project-run-crash")
+    store = ResearchProjectStore(runtime.projects_dir, project.project_id)
+    store.create(project)
+
+    original_invoke = runtime._graph.invoke
+
+    def crashing_invoke(state, **kwargs):
+        raise RuntimeError("synthetic worker crash")
+
+    runtime._graph.invoke = crashing_invoke  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="synthetic worker crash"):
+        runtime.run(project)
+
+    terminal = [row for row in store.read_events() if row.event_type == "project_terminal"]
+    assert terminal
+    detail = terminal[-1].detail
+    assert detail["task_id"] == project.project_id
+    assert detail["error_type"] == "RuntimeError"
+    assert "synthetic worker crash" in detail["error_message"]
+    assert detail["at"]
+    assert store.load_state().status == ProjectStatus.FAILED
+
+    # The executor remains usable: the next task runs to completion after the
+    # recorded failure.
+    runtime._graph.invoke = original_invoke
+    second = research_project("project-run-next")
+    runtime.run(second)
+    second_store = ResearchProjectStore(runtime.projects_dir, second.project_id)
+    assert second_store.load_state().status == ProjectStatus.COMPLETED
+
+
+def test_repair_revision_missing_request_raises_value_error_with_id(tmp_path):
+    runtime, _ = fake_research_runtime(tmp_path)
+    project = research_project("project-repair-missing-request")
+    store = ResearchProjectStore(runtime.projects_dir, project.project_id)
+    store.create(project)
+    plan = ResearchPlan(
+        project_id=project.project_id,
+        items=[WorkItemSpec(
+            item_id="literature_search",
+            title="Collect literature",
+            module="literature_search",
+            objective="Gather evidence.",
+            acceptance_criteria=["done"],
+        )],
+        planner_backend="deterministic-test",
+        rationale="P3-23 regression fixture.",
+    )
+    store.save_plan(plan)
+    missing_request_id = "repair-" + "a" * 24
+    store.append_plan_revision(ResearchPlanRevision(
+        revision_id="revision-" + "a" * 24,
+        project_id=project.project_id,
+        base_plan_id=plan.plan_id,
+        revision_number=1,
+        repair_request_id=missing_request_id,
+        operation="rerun_subgraph_same_inputs",
+        added_items=[WorkItemSpec(
+            item_id="literature_search__repair_1",
+            title="Repair literature",
+            module="literature_search",
+            objective="Rerun the search.",
+            acceptance_criteria=["done"],
+            rerun_of_item_id="literature_search",
+            repair_request_id=missing_request_id,
+        )],
+        superseded_item_ids=["literature_search"],
+        trigger_snapshot_digest="0" * 64,
+        revision_digest="0" * 64,
+        approval_required=False,
+    ))
+    with pytest.raises(ValueError, match=missing_request_id):
+        runtime._repair({"store": store, "project": project, "results": {}})

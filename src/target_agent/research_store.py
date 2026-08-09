@@ -95,6 +95,13 @@ class ResearchProjectStore:
         if not self.project_dir.is_relative_to(self.projects_dir):
             raise ValueError("project directory escapes projects root")
         self._lock = threading.RLock()
+        # Process-local JSONL tail cursors: name -> ((size, mtime_ns), count,
+        # last_sequence). A cursor is trusted only while the file stat still
+        # matches; appends made by this instance refresh it, so repeated
+        # appends never re-read the whole ledger. External writers fall back
+        # to a full parse (necessary for cross-process consistency).
+        self._jsonl_tail: dict[str, tuple[tuple[int, int], int, int]] = {}
+        self._domain_activity_by_key: dict[tuple[str, str], DomainActivityRecord] | None = None
 
     @staticmethod
     def _safe_component(value: str, label: str) -> str:
@@ -165,6 +172,64 @@ class ResearchProjectStore:
                 except Exception as exc:
                     raise ValueError(f"invalid {name} record at line {line_number}: {exc}") from exc
         return records
+
+    def _jsonl_tail_cursor(self, name: str, model: type[T]) -> tuple[int, int]:
+        """Return (record_count, last_sequence) for a sequence-numbered JSONL file.
+
+        Uses a process-local tail cursor to avoid full re-reads on repeated
+        appends; falls back to a full parse only when the file stat no longer
+        matches the cursor (e.g. another writer appended).
+        """
+        path = self.project_dir / name
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
+            return 0, 0
+        cached = self._jsonl_tail.get(name)
+        if cached is not None and cached[0] == (stat.st_size, stat.st_mtime_ns):
+            return cached[1], cached[2]
+        records = self._read_jsonl(name, model)
+        count = len(records)
+        last_sequence = records[-1].sequence if records else 0
+        self._jsonl_tail[name] = ((stat.st_size, stat.st_mtime_ns), count, last_sequence)
+        return count, last_sequence
+
+    def _note_jsonl_appended(self, name: str, count: int, last_sequence: int) -> None:
+        """Refresh the tail cursor after this instance appended one row."""
+        path = self.project_dir / name
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
+            return
+        self._jsonl_tail[name] = ((stat.st_size, stat.st_mtime_ns), count, last_sequence)
+
+    def _domain_activity_index(self) -> dict[tuple[str, str], DomainActivityRecord]:
+        """Return child_run_id/source_trace_id -> record for the activity ledger.
+
+        Built once per store instance and updated on appends; a changed file
+        stat (external writer) forces a full reload.
+        """
+        name = "domain_activities.jsonl"
+        path = self.project_dir / name
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
+            self._domain_activity_by_key = {}
+            return self._domain_activity_by_key
+        cached = self._jsonl_tail.get(name)
+        if (self._domain_activity_by_key is not None
+                and cached is not None and cached[0] == (stat.st_size, stat.st_mtime_ns)):
+            return self._domain_activity_by_key
+        records = self._read_jsonl(name, DomainActivityRecord)
+        self._domain_activity_by_key = {
+            (row.child_run_id, row.source_trace_id): row for row in records
+        }
+        self._jsonl_tail[name] = (
+            (stat.st_size, stat.st_mtime_ns),
+            len(records),
+            records[-1].sequence if records else 0,
+        )
+        return self._domain_activity_by_key
 
     @staticmethod
     def _read_model(path: Path, model: type[T]) -> T | None:
@@ -406,6 +471,9 @@ class ResearchProjectStore:
             raise ValueError("attempt project id does not match store project id")
         attempt_id = self._safe_component(attempt.attempt_id, "attempt id")
         with self._lock:
+            # Complexity boundary (P1-3 family): attempts are scanned per work
+            # item; the contract caps attempt_number at 3, so this stays
+            # effectively O(1) and needs no global tail index.
             prior = self.read_attempts(attempt.work_item_id)
             if any(row.attempt_id == attempt.attempt_id for row in prior):
                 raise ValueError("attempt id already exists")
@@ -517,6 +585,9 @@ class ResearchProjectStore:
         if lease.project_id != self.project_id:
             raise ValueError("lease project id does not match store project id")
         with self._lock:
+            # Complexity boundary (P1-3 family): leases are re-read per append
+            # for cross-process release/heartbeat safety; lease volume per work
+            # item is small, so a tail index is deferred.
             existing = self.read_leases(lease.work_item_id)
             active = [row for row in existing if row.released_at is None]
             if active:
@@ -721,9 +792,9 @@ class ResearchProjectStore:
         if work_item_id is not None:
             work_item_id = self._safe_component(work_item_id, "work item id")
         with self._lock:
-            events = self.read_events()
+            count, last_sequence = self._jsonl_tail_cursor("events.jsonl", ProjectEvent)
             event = ProjectEvent(
-                sequence=(events[-1].sequence + 1) if events else 1,
+                sequence=last_sequence + 1,
                 project_id=self.project_id,
                 event_type=event_type,
                 state=state,
@@ -731,10 +802,31 @@ class ResearchProjectStore:
                 detail=detail or {},
             )
             self._append_jsonl("events.jsonl", event)
+            self._note_jsonl_appended("events.jsonl", count + 1, last_sequence + 1)
             return event
 
-    def read_events(self) -> list[ProjectEvent]:
-        return self._read_jsonl("events.jsonl", ProjectEvent)
+    def read_events(
+        self,
+        after_sequence: int = 0,
+        limit: int | None = None,
+    ) -> list[ProjectEvent]:
+        """Read ordered events after a client cursor (incremental read support).
+
+        ``after_sequence`` filters events with sequence greater than the cursor
+        (default 0 returns everything); ``limit`` caps the page size (1..500).
+        """
+        if after_sequence < 0:
+            raise ValueError("after_sequence must be non-negative")
+        if limit is not None and not 1 <= limit <= 500:
+            raise ValueError("limit must be between 1 and 500")
+        records = self._read_jsonl("events.jsonl", ProjectEvent)
+        rows = [row for row in records if row.sequence > after_sequence]
+        return rows[:limit] if limit is not None else rows
+
+    def count_events(self) -> int:
+        """Return the number of persisted project events (tail-cursor based)."""
+        count, _ = self._jsonl_tail_cursor("events.jsonl", ProjectEvent)
+        return count
 
     def append_domain_activity(self, projection: DomainActivityProjection) -> DomainActivityRecord:
         """Assign sequence and append one child-trace projection idempotently."""
@@ -747,19 +839,17 @@ class ResearchProjectStore:
         self._safe_component(work_item_id, "work item id")
         self._safe_component(child_run_id, "child run id")
         with self._lock:
-            existing = next(
-                (
-                    row for row in self.read_domain_activities()
-                    if row.child_run_id == child_run_id and row.source_trace_id == source_trace_id
-                ),
-                None,
-            )
+            index = self._domain_activity_index()
+            existing = index.get((child_run_id, source_trace_id))
             if existing is not None:
                 if existing != projection.to_record(existing.sequence):
                     raise ValueError("source trace id has a conflicting domain activity projection")
                 return existing
-            record = projection.to_record(len(self.read_domain_activities()) + 1)
+            count, _ = self._jsonl_tail_cursor("domain_activities.jsonl", DomainActivityRecord)
+            record = projection.to_record(count + 1)
             self._append_jsonl("domain_activities.jsonl", record)
+            self._domain_activity_by_key[(child_run_id, source_trace_id)] = record
+            self._note_jsonl_appended("domain_activities.jsonl", count + 1, count + 1)
             return record
 
     def read_domain_activities(
@@ -781,8 +871,8 @@ class ResearchProjectStore:
         return records[:limit] if limit is not None else records
 
     def domain_activity_cursor(self) -> int:
-        records = self._read_jsonl("domain_activities.jsonl", DomainActivityRecord)
-        return records[-1].sequence if records else 0
+        _, last_sequence = self._jsonl_tail_cursor("domain_activities.jsonl", DomainActivityRecord)
+        return last_sequence
 
     def append_assessment(self, record: AssessmentRecord) -> None:
         if record.project_id != self.project_id:
@@ -916,6 +1006,9 @@ class ResearchProjectStore:
         Idempotent across crash windows: a content-addressed record whose
         version row already exists is only bound to the head, never duplicated.
         """
+        # Complexity boundary (P1-3 family): the full artifact_versions ledger
+        # is re-read on registration. Per-artifact rows are small in typical
+        # projects; a per-artifact tail index remains a future optimization.
         versions = [
             row for row in self.read_artifact_versions()
             if row.work_item_id == record.work_item_id and row.logical_name == record.logical_name

@@ -185,7 +185,7 @@ def test_portal_payload_scrubs_secrets_and_paths():
             "context": {
                 "api_key": "sk-abc123",
                 "uri": "https://europepmc.org/article/MED/42123659",
-                "note": "see " + "/ho" + "me/user/x and D:\\tmp\\y and a@b" + ".com",
+                "note": "see " + "/ho" + "me/user/x and D:\\tmp\\y and /da" + "ta/foo/bar and a@b" + ".com",
                 "credential": {"token": "tok-1234567890"},
             },
         },
@@ -213,5 +213,6 @@ def test_portal_payload_scrubs_secrets_and_paths():
     assert "tok-1234567890" not in text
     assert "/home/user" not in text
     assert "D:\\tmp" not in text
+    assert "/data/foo/bar" not in text
     assert "a@b" + ".com" not in text
     assert "redacted" in text

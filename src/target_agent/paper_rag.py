@@ -291,6 +291,12 @@ class PaperRagStore:
 
     def __init__(self, path: Path | str):
         self.path = Path(path).expanduser().resolve()
+        # Process-local chunk cache plus the file stat it was parsed from.
+        # mtime/size changes invalidate it, so repeated searches/adds do not
+        # re-read the whole corpus unless another writer changed the file.
+        self._rows: list[PaperChunk] | None = None
+        self._row_stat: tuple[int, int] | None = None
+        self._row_ids: dict[str, PaperChunk] | None = None
 
     def _load(self) -> list[PaperChunk]:
         if not self.path.is_file():
@@ -306,25 +312,62 @@ class PaperRagStore:
                     raise ValueError(f"invalid paper chunk at line {line_number}: {exc}") from exc
         return rows
 
+    def _current_stat(self) -> tuple[int, int] | None:
+        try:
+            stat = self.path.stat()
+        except FileNotFoundError:
+            return None
+        return stat.st_size, stat.st_mtime_ns
+
+    def _cached_rows(self) -> list[PaperChunk]:
+        stat = self._current_stat()
+        if stat is None:
+            self._rows = None
+            self._row_stat = None
+            self._row_ids = None
+            return []
+        if self._rows is not None and self._row_stat == stat:
+            return self._rows
+        rows = self._load()
+        self._rows = rows
+        self._row_stat = stat
+        self._row_ids = {row.chunk_id: row for row in rows}
+        return rows
+
+    def _note_appended(self) -> None:
+        self._row_stat = self._current_stat()
+
     def all(self) -> list[PaperChunk]:
-        return self._load()
+        return self._cached_rows()
 
     def get(self, chunk_id: str) -> PaperChunk | None:
-        return next((row for row in self._load() if row.chunk_id == chunk_id), None)
+        self._cached_rows()
+        return self._row_ids.get(chunk_id) if self._row_ids is not None else None
 
     def add(self, chunk: PaperChunk) -> bool:
         if chunk.digest != chunk.compute_digest():
             raise ValueError("paper chunk digest is not self-consistent")
-        existing = {row.chunk_id for row in self._load()}
-        if chunk.chunk_id in existing:
+        rows = self._cached_rows()
+        known = self._row_ids
+        if known is None:
+            known = {row.chunk_id: row for row in rows}
+            self._row_ids = known
+        if chunk.chunk_id in known:
             return False
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8", newline="\n") as handle:
             handle.write(chunk.model_dump_json() + "\n")
+        rows.append(chunk)
+        known[chunk.chunk_id] = chunk
+        self._note_appended()
         return True
 
     def add_many(self, chunks: Iterable[PaperChunk]) -> dict[str, int]:
-        known = {row.chunk_id for row in self._load()}
+        rows = self._cached_rows()
+        known = self._row_ids
+        if known is None:
+            known = {row.chunk_id: row for row in rows}
+            self._row_ids = known
         added = 0
         skipped = 0
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -336,9 +379,11 @@ class PaperRagStore:
                     skipped += 1
                     continue
                 handle.write(chunk.model_dump_json() + "\n")
-                known.add(chunk.chunk_id)
+                rows.append(chunk)
+                known[chunk.chunk_id] = chunk
                 added += 1
-        return {"added": added, "skipped": skipped, "total": len(self._load())}
+        self._note_appended()
+        return {"added": added, "skipped": skipped, "total": len(rows)}
 
     def search(
         self,
@@ -353,7 +398,7 @@ class PaperRagStore:
         disease_tokens = _signal_tokens(disease)
         available = {str(lane).lower() for lane in lanes_available} if lanes_available is not None else None
         scored: list[PaperChunkHit] = []
-        for chunk in self._load():
+        for chunk in self._cached_rows():
             score, reasons = _score_chunk(chunk, query_tokens, disease_tokens, available)
             if score >= min_score:
                 scored.append(PaperChunkHit(chunk=chunk, score=score, matched_reason=reasons))
@@ -361,7 +406,7 @@ class PaperRagStore:
         return scored[: max(0, top_k)]
 
     def corpus_card(self) -> dict[str, Any]:
-        rows = self._load()
+        rows = self._cached_rows()
         journals: dict[str, int] = {}
         years: dict[str, int] = {}
         lanes: dict[str, int] = {}
@@ -381,7 +426,7 @@ class PaperRagStore:
         }
 
     def write_manifest(self) -> dict[str, Any]:
-        rows = self._load()
+        rows = self._cached_rows()
         manifest = {
             "contract_version": RAG_CONTRACT_VERSION,
             "chunks": len(rows),

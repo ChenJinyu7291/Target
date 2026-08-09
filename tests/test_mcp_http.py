@@ -105,3 +105,36 @@ def test_mcp_session_tools_drive_a_real_project(tmp_path):
         assert fork["messages"][1]["kind"] == "intervention_result"
 
     asyncio.run(scenario())
+
+def test_mcp_tool_schemas_bound_parameters_and_reject_invalid_values(tmp_path):
+    import asyncio
+
+    from target_agent.mcp_server import create_mcp_server
+
+    from .test_research_runtime import fake_research_runtime, research_project
+
+    runtime, _ = fake_research_runtime(tmp_path)
+    project = research_project("project-mcp-bounds")
+    runtime.run(project)
+    server = create_mcp_server(runtime=runtime)
+
+    async def scenario():
+        tools = {tool.name: tool for tool in await server.list_tools()}
+        activities_schema = getattr(tools["target_get_domain_activities"], "input_schema", None) or getattr(tools["target_get_domain_activities"], "inputSchema")
+        properties = activities_schema["properties"]
+        assert properties["project_id"].get("minLength") == 1
+        assert properties["after_sequence"].get("minimum") == 0
+        assert properties["limit"].get("minimum") == 1
+        assert properties["limit"].get("maximum") == 500
+        read_schema = getattr(tools["target_read_text_artifact"], "input_schema", None) or getattr(tools["target_read_text_artifact"], "inputSchema")
+        assert read_schema["properties"]["project_id"].get("minLength") == 1
+        assert read_schema["properties"]["max_characters"].get("minimum") == 1
+        assert read_schema["properties"]["max_characters"].get("maximum") == 1_000_000
+
+        with pytest.raises(Exception, match="(?i)limit|invalid"):
+            await server.call_tool("target_get_domain_activities", {
+                "project_id": project.project_id,
+                "limit": 0,
+            })
+
+    asyncio.run(scenario())

@@ -9,8 +9,8 @@
 | --- | --- | --- | --- | --- |
 | SciForge | 科研 Agent 的人类控制面与证据层 | 关键节点干预面板、Evidence/Project DAG、长期工作区、发布审批 | 已有 checkpoint/repair/fork 审批、证据图、项目控制面 | 缺会话式干预与多角色长期工作区 |
 | OpenScience | 本地科研工作台 | 开箱即用、模型供应商路由、290+ Skills 渐进加载、浏览器工作区、blind reviewer 门 | 有 Step/OpenAI 兼容路由、SkillCatalog、Web 工作台 | 缺聊天式会话、文件编辑/终端工作区 |
-| OpenAI4S | JSON 编排 + 持久内核双平面 | Action Ledger、plan/review 状态机、持久内核、版本化产物、分享包、doctor | 已有 Ledger/评审/产物/内核/doctor | 缺只读分享包与 HTTP MCP |
-| Wisp Science | local-first 桌面科研工作台 | 本地/SSH/GPU 执行上下文、OS keyring、MCP 数据库连接器、Skills 渐进披露 | 已有远程 profile 与内核执行 | 密钥仍在 .env；MCP 仅 stdio |
+| OpenAI4S | JSON 编排 + 持久内核双平面 | Action Ledger、plan/review 状态机、持久内核、版本化产物、分享包、doctor | 已有 Ledger/评审/产物/内核/doctor/只读分享包 | Streamable HTTP MCP 基础已完成；缺认证/多租户 |
+| Wisp Science | local-first 桌面科研工作台 | 本地/SSH/GPU 执行上下文、OS keyring、MCP 数据库连接器、Skills 渐进披露 | 已有远程 profile、内核执行与 OS keyring | MCP stdio + Streamable HTTP 基础（认证/多租户未完成） |
 
 ## 2. 重构后的目标架构
 
@@ -47,6 +47,7 @@
 - `target-agent-mcp --transport streamable-http --host/--port/--path` 与 `target-agent mcp-serve --transport ...`：同一薄适配器同时支持 stdio 与官方 Streamable HTTP 传输，服务面不变（create/run/inspect/approve/repair/fork/artifact）。
 - 新增 `_serve()` 帮助函数与 `tests/test_mcp_http.py`（stdio 与 streamable-http 参数路由、server 可运行性）。
 - 意义：Target 现在可作为 HTTP MCP 服务嵌入 OpenScience/Wisp/SciForge 等科研工作台，不需要宿主理解内部存储。
+- 边界：基础 transport 已完成（默认绑定 127.0.0.1，本地/可信网络）；认证、多租户与生产级发布未完成。
 
 
 ### P2.12 研究会话层（已完成，2026-08-08）

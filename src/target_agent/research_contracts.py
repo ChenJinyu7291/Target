@@ -879,6 +879,10 @@ class ResearchProjectSnapshot(ResearchContract):
             *self.artifacts, *self.assessments, *self.decisions, *self.repair_requests,
             *self.plan_revisions, *self.repair_resolutions, *self.fork_directives,
             *self.plan_branches,
+            # WorkItemResult is not project-bound today; the getattr default
+            # keeps the check inert until the contract carries project_id.
+            *self.work_item_results, *self.work_attempts, *self.artifact_versions,
+            *self.review_targets, *self.worker_leases,
             *self.work_item_heads,
             *self.artifact_heads,
         ]

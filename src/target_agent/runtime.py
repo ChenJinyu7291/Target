@@ -334,9 +334,11 @@ class TargetDiscoveryRuntime:
                 results,
                 findings,
                 minimum_coloc_pp4=task.constraints.genetics.minimum_coloc_pp4,
+                task_context=task.context,
+                terminal_status=status,
             )
             ranked_payload = self._serialize_ranked(ranked, task.constraints.max_ranked_targets)
-            cards = build_cards(task, ranked)
+            cards = build_cards(task, ranked, terminal_status=status)
             store.save_json("ranked_targets.json", ranked_payload)
             store.save_cards(cards)
             graph = build_mechanistic_graph(task, evidence, [row["gene"] for row in ranked_payload])

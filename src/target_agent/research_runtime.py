@@ -12,7 +12,8 @@ from .contracts import utc_now
 from .llm import StepClient
 from .research_contracts import (
     AssessmentDimension, AssessmentLevel, AssessmentRecord, AssessmentResult, AutonomyMode, DataContract,
-    DecisionAction, DecisionEvent, FailureClass, ForkMode, PlanBranch, PlanBranchStatus, ProjectState,
+    DecisionAction, DecisionEvent, FailureClass, ForkDirective, ForkMode, PlanBranch,
+    PlanBranchStatus, ProjectState,
     ProjectStatus, RepairAction, RepairAuthorization, RepairResolutionStatus, ResearchPlan,
     ResearchProjectSpec, ReviewTarget,
     TERMINAL_WORK_ITEM_STATUSES,
@@ -61,6 +62,17 @@ class ResearchRuntimeState(TypedDict, total=False):
 
 class _InputContractError(ValueError):
     pass
+
+
+def _effective_input_digest(payload: dict[str, Any]) -> str:
+    """Digest of the effective execution context, not just the declared inputs.
+
+    The payload combines the work item's own ``inputs`` with the ``outputs``
+    of every dependency, so the digest intentionally binds to downstream
+    results; fork/repair replay relies on this binding to detect same-input
+    changes.
+    """
+    return canonical_sha256(payload)
 
 
 def validate_data_contract(
@@ -409,7 +421,7 @@ class ResearchProjectRuntime:
             **item.inputs,
             "dependencies": {dependency: results[dependency].outputs for dependency in item.dependencies},
         }
-        effective_input_digest = canonical_sha256(input_payload)
+        effective_input_digest = _effective_input_digest(input_payload)
         try:
             supersedes_result_digest: str | None = None
             if item.rerun_of_item_id is not None:
@@ -786,6 +798,71 @@ class ResearchProjectRuntime:
         store.append_event("work_attempt_recorded", result.status.value, work_item_id=item.item_id,
                            detail={"attempt_id": attempt_id, "attempt_number": attempt_number})
 
+    def _record_restore_attempt(
+        self,
+        store: ResearchProjectStore,
+        project: ResearchProjectSpec,
+        directive: ForkDirective,
+        source_attempt: WorkAttempt,
+        restored: WorkItemResult,
+    ) -> WorkAttempt:
+        """Persist a restore-type attempt so the rebound result is head-backed.
+
+        RESTORE re-binds an immutable historical payload to the active fork
+        point without executing it. Without a fresh attempt row and head, the
+        working result.json mirror would diverge from the committed head and a
+        later recovery pass would silently discard the restored payload.
+        """
+        if restored.status == WorkItemStatus.COMPLETED:
+            attempt_status = WorkAttemptStatus.COMPLETED
+        elif restored.status == WorkItemStatus.COMPLETED_WITH_GAPS:
+            attempt_status = WorkAttemptStatus.COMPLETED_WITH_GAPS
+        elif restored.status == WorkItemStatus.FAILED:
+            attempt_status = WorkAttemptStatus.FAILED
+        else:
+            raise ValueError(
+                f"cannot restore a non-terminal work item result: {restored.status.value}"
+            )
+        restored_digest = work_item_result_digest(restored)
+        existing = next(
+            (
+                row for row in store.read_attempts(directive.target_work_item_id)
+                if row.supersedes_attempt_id == source_attempt.attempt_id
+                and row.output_digest == restored_digest
+            ),
+            None,
+        )
+        if existing is not None and store.load_attempt_result(existing.attempt_id) is not None:
+            attempt = existing
+        else:
+            attempt = WorkAttempt(
+                attempt_id=self._new_contract_id("attempt"),
+                project_id=project.project_id,
+                work_item_id=directive.target_work_item_id,
+                attempt_number=len(store.read_attempts(directive.target_work_item_id)) + 1,
+                status=attempt_status,
+                input_digest=source_attempt.input_digest,
+                output_digest=restored_digest,
+                worker_lease_id=None,
+                supersedes_attempt_id=source_attempt.attempt_id,
+                started_at=source_attempt.started_at,
+                completed_at=utc_now(),
+            )
+            store.save_attempt_result(attempt, restored)
+            store.append_attempt(attempt)
+        current_head = store.read_work_item_head(directive.target_work_item_id)
+        if current_head is None or current_head.attempt_id != attempt.attempt_id:
+            store.update_work_item_head(WorkItemHead(
+                project_id=project.project_id,
+                work_item_id=directive.target_work_item_id,
+                attempt_id=attempt.attempt_id,
+                result_digest=restored_digest,
+                status=restored.status,
+                version=(current_head.version + 1) if current_head is not None else 1,
+                supersedes_head_id=current_head.head_id if current_head is not None else None,
+            ), expected_version=current_head.version if current_head is not None else None)
+        return attempt
+
     def _fork(self, state: ResearchRuntimeState) -> dict[str, Any]:
         """Apply user-issued rollback branches (redo or restore) with dependency invalidation.
 
@@ -983,11 +1060,18 @@ class ResearchProjectRuntime:
                                 if current_target is not None else None
                             ),
                         })
+                    restore_attempt = self._record_restore_attempt(
+                        store, project, directive, attempt, restored,
+                    )
                     store.save_work_item_result(restored)
                     results[directive.target_work_item_id] = restored
                     store.append_event(
                         "result_restored", "restored", work_item_id=directive.target_work_item_id,
-                        detail={"branch_id": branch.branch_id, "attempt_id": attempt.attempt_id},
+                        detail={
+                            "branch_id": branch.branch_id,
+                            "attempt_id": attempt.attempt_id,
+                            "restore_attempt_id": restore_attempt.attempt_id,
+                        },
                     )
                 return {"plan": revised_plan, "results": results,
                         "execution_done": False, "execution_paused": False}
@@ -1030,7 +1114,15 @@ class ResearchProjectRuntime:
         for revision in revisions:
             if revision.fork_branch_id is not None or revision.repair_request_id in resolved_request_ids:
                 continue
-            request = next(row for row in requests if row.repair_request_id == revision.repair_request_id)
+            try:
+                request = next(
+                    row for row in requests if row.repair_request_id == revision.repair_request_id
+                )
+            except StopIteration as exc:
+                raise ValueError(
+                    f"repair revision references missing repair request: "
+                    f"{revision.repair_request_id}"
+                ) from exc
             resolution = build_repair_resolution(
                 request=request,
                 revision=revision,
@@ -1354,9 +1446,21 @@ class ResearchProjectRuntime:
                     project_id=project.project_id, status=ProjectStatus.FAILED,
                     completed_items=_completed_item_ids(store.load_work_item_results()),
                     attempts=current.attempts if current else {},
-                    terminal_reason=f"Unhandled runtime error: {exc.__class__.__name__}",
+                    terminal_reason=(
+                        f"Unhandled runtime error: {exc.__class__.__name__}: {exc}"
+                    ),
                 ))
-                store.append_event("project_terminal", "failed", detail={"error": exc.__class__.__name__})
+                store.append_event("project_terminal", "failed", detail={
+                    # Structured worker failure record: task identifier,
+                    # exception type/message and wall-clock time. The executor
+                    # re-raises so callers observe the failure; later tasks can
+                    # still be processed by the next run() call.
+                    "task_id": project.project_id,
+                    "work_item_id": current.current_item_id if current is not None else None,
+                    "error_type": exc.__class__.__name__,
+                    "error_message": str(exc) or None,
+                    "at": utc_now(),
+                })
             raise
         state = store.load_state()
         if state is None:

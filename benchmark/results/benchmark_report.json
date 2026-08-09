@@ -2,10 +2,10 @@
   "summary": {
     "goldset": "benchmark/goldset_v2.jsonl",
     "live": false,
-    "tasks": 11,
-    "tasks_passed": 11,
-    "assertions": 27,
-    "assertions_passed": 27,
+    "tasks": 13,
+    "tasks_passed": 13,
+    "assertions": 29,
+    "assertions_passed": 29,
     "score": 1.0,
     "categories": {
       "main_chain": {
@@ -29,8 +29,8 @@
         "score": 1.0
       },
       "contract": {
-        "assertions": 3,
-        "passed": 3,
+        "assertions": 5,
+        "passed": 5,
         "score": 1.0
       }
     }
@@ -135,7 +135,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 5.95
+      "elapsed_s": 0.66
     },
     {
       "id": "BM-02",
@@ -168,7 +168,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 2.47
+      "elapsed_s": 1.0
     },
     {
       "id": "BM-03",
@@ -186,7 +186,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 1.21
+      "elapsed_s": 1.41
     },
     {
       "id": "BM-04",
@@ -203,7 +203,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.23
+      "elapsed_s": 0.77
     },
     {
       "id": "BM-05",
@@ -221,7 +221,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.31
+      "elapsed_s": 0.8
     },
     {
       "id": "BM-06",
@@ -250,7 +250,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.25
+      "elapsed_s": 0.27
     },
     {
       "id": "BM-07",
@@ -284,7 +284,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.13
+      "elapsed_s": 0.16
     },
     {
       "id": "BM-08",
@@ -311,7 +311,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.08
+      "elapsed_s": 0.11
     },
     {
       "id": "BM-09",
@@ -365,7 +365,43 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.62
+      "elapsed_s": 0.97
+    },
+    {
+      "id": "BM-12",
+      "title": "Offline pattern-few-shot ablation keeps deterministic plans valid and reports coverage",
+      "category": "contract",
+      "mode": "unit",
+      "results": [
+        {
+          "assertion": {
+            "type": "unit",
+            "check": "pattern_ablation_offline"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 1.31
+    },
+    {
+      "id": "BM-13",
+      "title": "Paper-RAG hits project as strategy-only graph nodes without leaking into evidence",
+      "category": "contract",
+      "mode": "unit",
+      "results": [
+        {
+          "assertion": {
+            "type": "unit",
+            "check": "paper_rag_graph_projection"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.0
     },
     {
       "id": "BM-L1",

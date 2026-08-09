@@ -25,7 +25,7 @@ Disease -> GEO/CELLxGENE discovery -> metadata audit -> reviewed analysis recipe
 - ClinicalTrials.gov API v2 adds gene-named trial-registry evidence (`clinical_trials_gov`); claims are emitted only when the intervention or title text explicitly names the gene, and stopped trials are downgraded to uncertain.
 - The literature tool upgrades to full-text-aware RAG: open-access PMC full texts are section-parsed into a persistent shared FTS5 corpus with optional LLM reranking and bm25 fallback.
 - Two execution engines ship and are parity-tested: the legacy hand-rolled state machine and the LangGraph `StateGraph` runtime (default; `--runtime legacy` opts out). Both write contract-compatible, parity-tested observable artifacts and share the same checkpoint/resume contract.
-- A systematic benchmark lives in [benchmark/](benchmark/): 14 internal contract/regression tasks (fake/unit/live modes) covering the main chain, robustness, determinism, recovery, contract gates and engine parity; `python benchmark/runner.py` must score 100% in fake+unit mode. This is not an external blind biological result.
+- A systematic benchmark lives in [benchmark/](benchmark/): 13 non-live internal contract/regression tasks plus 3 live-mode tasks（以 `benchmark/goldset_v2.jsonl` 为准）covering the main chain, robustness, determinism, recovery, contract gates and engine parity; `python benchmark/runner.py` must score 100% in fake+unit mode. `benchmark/results/benchmark_report.json` 已于 2026-08-09 远程重跑刷新为 13 tasks / 29 assertions（score 1.0）。This is not an external blind biological result.
 - The Reviewer LoRA pipeline (data + training + heldout evaluation + remote GPU runbook) is under [training/](training/); local CPU smoke is verified, full training runs on the external GPU profile only. At runtime the trained adapter acts as an optional probe-based confirmation layer inside the Reviewer (configure `TARGET_AGENT_REVIEWER_LORA_BASE`/`TARGET_AGENT_REVIEWER_LORA_ADAPTER`): deterministic gates stay authoritative, adapter answers are category-cross-checked and silently discarded on any parse/category failure, and SFT categories are mapped onto the canonical finding taxonomy before a ReviewerFinding is emitted.
 - The externally stored Reviewer adapter used in prior acceptance was trained on the earlier generic V2.1 failure taxonomy; model weights are not tracked in Git. V2.2 genetics gates are deterministic and authoritative; genetics-specific alignment examples require fresh scientific and engineering review and retraining before any model-alignment claim is upgraded.
 - PyDESeq2 accepts non-negative integer counts only. Continuous expression requires the explicitly enabled fixed limma backend.
@@ -50,8 +50,9 @@ target-agent run-disease --disease uc --kind missing_context --summary-out batch
 ```
 
 The same four buckets feed the benchmark: `benchmark/generate_disease_goldset.py` renders
-`goldset_diseases.jsonl` (72 fake-mode entries, CI gate at 100%) and `goldset_diseases_lora.jsonl`
+`goldset_diseases.jsonl` (72 fake-mode entries) and `goldset_diseases_lora.jsonl`
 (live matrix whose expectation-derived assertions require the Reviewer LoRA backend).
+仓库门禁为 `python scripts/repo_policy_check.py` + `pytest`；首个 CI 配置见 [.github/workflows/ci.yml](.github/workflows/ci.yml)，由父任务统一评审（仓库当前不声称外部 CI 已在运行）。
 
 The regression matrices do not measure biological ranking quality. A separate scorer-only blind
 ranking protocol is documented in [benchmark/rubric.md](benchmark/rubric.md): Agent task, ranking
@@ -130,7 +131,7 @@ target-agent skills search --lanes genetics
 target-agent skills show --id experiment-planning
 ```
 
-7. 管理持久分析内核（Python/R 会话，状态跨执行保留；仅供人工或注册工具使用，LLM 不自动执行代码）：
+8. 管理持久分析内核（Python/R 会话，状态跨执行保留；仅供人工或注册工具使用，LLM 不自动执行代码）：
 
 ```bash
 target-agent kernel start --language python
@@ -139,6 +140,15 @@ target-agent kernel exec --kernel-id <id> --code "x = 5; __kernel_result__ = x *
 target-agent kernel stop --kernel-id <id>
 target-agent kernel stop-all
 ```
+
+## 双合同版本（TaskSpec 2.2.0 / ResearchProjectSpec 3.0.0）
+
+仓库同时出现两个合同版本，分工不同：
+
+- **科学输入合同 `TaskSpec 2.2.0`**（[contracts.py](src/target_agent/contracts.py)，`CONTRACT_VERSION=2.2.0`）：描述疾病靶点发现任务本身的输入——疾病、组织、细胞类型、阶段、表型、约束与数据偏好；JSON Schema 由 Pydantic 生成。
+- **项目控制面合同 `ResearchProjectSpec 3.0.0`**（[research_contracts.py](src/target_agent/research_contracts.py)，`RESEARCH_CONTRACT_VERSION=3.0.0`）：描述不可变研究项目的控制面——goal、autonomy_mode、工作项/修复/回退预算（max_work_items / max_replans / max_forks）、workflow 模板绑定（SHA-256 冻结）与快照绑定决策。
+
+Web 工作台能力条按“科学合同 2.2.0 · 项目合同 3.0.0”显示；创建项目时前者写入 `context.target_task_spec.contract_version`，后者写入项目 spec 顶层 `contract_version`。
 
 ## Executable workflow templates
 
@@ -200,6 +210,20 @@ target-agent project-approve --project-id project-alzheimer-example --target-id 
 target-agent project-repair-decision --project-id project-alzheimer-example \
   --repair-request-id REPAIR_ID --snapshot-digest SNAPSHOT_SHA256 --approve \
   --actor reviewer --rationale "Approve bounded same-input retry" --resume
+# Fork/branch and session control plane (same service as Web/MCP):
+target-agent project-branches --project-id project-alzheimer-example
+target-agent project-fork-propose --project-id project-alzheimer-example \
+  --target-work-item-id WORK_ITEM_ID --mode redo --actor reviewer \
+  --rationale "Rerun with bounded inputs"
+target-agent project-fork-decision --project-id project-alzheimer-example \
+  --branch-id branch-xxx --approve --actor reviewer --rationale "Approved"
+target-agent session create --project-id project-alzheimer-example --role reviewer
+target-agent session list --project-id project-alzheimer-example
+target-agent session post --project-id project-alzheimer-example \
+  --session-id session-xxx --text "What is the status?" --ask-agent
+target-agent session intervene --project-id project-alzheimer-example \
+  --session-id session-xxx --action accept_checkpoint --target-id PLAN_ID \
+  --actor reviewer --rationale "Approved"
 target-agent serve --host 127.0.0.1 --port "$TARGET_AGENT_PORT"
 ```
 
@@ -251,16 +275,14 @@ the conversation/approval loop with role-aware sessions (viewer sessions are rea
 It does not expose arbitrary shell or model-generated code execution. Remote registry
 publication and host-specific installation bundles remain future integration work.
 
-## Demo workbench
+## Demo workbench（真实演示路径）
 
-The workbench supports two paths without changing the scientific runtime:
+The repository does not ship stored-replay demo data; `/api/demo/*` and `/api/runs/*` are legacy endpoints not used by the workbench. The honest presentation paths are:
 
-- **Acceptance-checked stored replay:** `/api/demo/cases` lists available curated runs, and `/api/runs/{run_id}/bundle` returns a frontend-ready, secret-safe view of the stored Plan, Trace, tools, evidence, ranking, TargetCards and Reviewer findings.
-- **Live run:** the same page submits a new `TaskSpec 2.2.0`, streams Trace events over SSE and renders the resulting backend artifacts when the run reaches a terminal state.
+- **Live project:** `target-agent serve --port 8888`, create or open a durable project, and walk through plan/session approvals, results, branches, artifacts and evidence graphs. Live runs may call Step and public databases.
+- **Offline review page:** `target-agent share --project-id <id> --output <id>.html` (or `--input <package>.zip`) renders a single-file, offline, network-free HTML snapshot with a SHA-256 fingerprint and scrubbed secrets — suitable as a network-free fallback and for reviewers.
 
-Replay is explicitly labelled as an acceptance-checked stored run. The acceptance covers Trace and artifact integrity, not biological truth. Replay does not call Step or public databases and is the recommended five-minute presentation path. Live execution remains available when network time permits.
-
-See [DEMO_GUIDE.md](docs/DEMO_GUIDE.md) for the five-minute narration, verification checklist and recovery path.
+See [DEMO_GUIDE.md](docs/DEMO_GUIDE.md) for the presentation path, verification checklist and recovery tips.
 
 
 ### One-command start and OS-keyring secrets

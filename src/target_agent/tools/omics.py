@@ -243,20 +243,26 @@ class DiseaseResolverTool(ScientificTool):
             normalized, synonyms, known_id, identifier_source, cached = self._ontology(context, disease)
         else:
             normalized, synonyms, known_id, identifier_source = disease, [], None, "unresolved"
+        resolver_unresolved = identifier_source == "unresolved"
         outputs = {
-            "covered": bool(disease), "normalized_disease": normalized,
+            "covered": not resolver_unresolved, "normalized_disease": normalized,
             "search_synonyms": list(dict.fromkeys([value for value in synonyms if value])),
             "disease_id": context.task.context.disease_id or known_id,
             "identifier_source": identifier_source,
         }
+        if resolver_unresolved:
+            outputs["warnings"] = ["disease_identifier_unresolved"]
         result = ToolResult(
             tool_name=self.name, tool_version=self.version,
-            status=ToolStatus.SUCCESS if disease else ToolStatus.OUT_OF_SCOPE,
-            coverage_status=CoverageStatus.COVERED if disease else CoverageStatus.NOT_COVERED,
-            context_match_score=1.0 if disease else 0.0,
+            status=ToolStatus.PARTIAL if resolver_unresolved and disease else (
+                ToolStatus.SUCCESS if disease else ToolStatus.OUT_OF_SCOPE
+            ),
+            coverage_status=CoverageStatus.NOT_COVERED if resolver_unresolved else CoverageStatus.COVERED,
+            context_match_score=0.0 if resolver_unresolved else 1.0,
             inputs={"disease": disease}, outputs=outputs, capability=_capability("Disease-label normalization"),
             data_version="EBI-OLS-live-or-cache", code_version="2.1.0",
             parameters={"alias_table_version": "2026-08-03", "ontology_endpoint": OLS_SEARCH}, cached=cached,
+            warnings=["disease_identifier_unresolved"] if resolver_unresolved else [],
         )
         return ToolExecution(result=result, evidence=[])
 
@@ -1264,6 +1270,15 @@ class BulkExpressionAnalysisTool(ScientificTool):
                         uncertainty="Differential expression is observational and cohort-specific, not causal evidence.",
                         quality_flags=["observational_not_causal"],
                         context_match_score=float(recipe.parameters.get("dataset_context_match_score", 0.85)),
+                        context_match={
+                            "matched_disease": [context.task.context.disease] if context.task.context.disease else [],
+                            "matched_tissue": [context.task.context.tissue] if context.task.context.tissue else [],
+                            "matched_cell": [context.task.context.cell_type] if context.task.context.cell_type else [],
+                            "matched_assay": ["bulk RNA-seq PyDESeq2"],
+                            "source_fields": ["GEO series matrix", "PyDESeq2 case-control result"],
+                            "context_score_origin": "tool_estimate",
+                            "tool_estimate": float(recipe.parameters.get("dataset_context_match_score", 0.85)),
+                        },
                     ))
                 if identifier_mapping_required:
                     warnings.append(f"{recipe.accession}:gene_identifier_mapping_required")
@@ -1294,7 +1309,15 @@ class BulkExpressionAnalysisTool(ScientificTool):
                 default=0.0,
             ) if success else 0.0,
             inputs={"recipe_ids": [recipe.recipe_id for recipe in recipes]},
-            outputs={"omics_results": summaries, "formal_score_eligible": success},
+            outputs={"omics_results": summaries, "formal_score_eligible": success,
+                     "context_match": {
+                         "matched_disease": [context.task.context.disease] if context.task.context.disease else [],
+                         "matched_tissue": [context.task.context.tissue] if context.task.context.tissue else [],
+                         "matched_cell": [context.task.context.cell_type] if context.task.context.cell_type else [],
+                         "matched_assay": ["bulk RNA-seq"],
+                         "source_fields": ["GEO series matrix"],
+                     },
+                     "context_score_origin": "tool_estimate"},
             candidate_genes=candidates, capability=_capability("Processed GEO bulk matrices with explicit case-control metadata"),
             data_version="per-source-sha256", code_version="2.1.0",
             parameters={
@@ -1377,7 +1400,16 @@ class CellxgeneDiscoveryTool(ScientificTool):
         result = ToolResult(
             tool_name=self.name, tool_version=self.version, status=status, coverage_status=coverage,
             context_match_score=max((row["context_match_score"] for row in rows), default=0.0),
-            inputs={"value_filter": value_filter}, outputs={"dataset_candidates": rows, "size_checked_before_expression": True},
+            inputs={"value_filter": value_filter},
+            outputs={"dataset_candidates": rows, "size_checked_before_expression": True,
+                     "context_match": {
+                         "matched_disease": [context.task.context.disease] if context.task.context.disease else [],
+                         "matched_tissue": [context.task.context.tissue] if context.task.context.tissue else [],
+                         "matched_cell": [context.task.context.cell_type] if context.task.context.cell_type else [],
+                         "matched_assay": ["CELLxGENE Census query"],
+                         "source_fields": ["Census:2025-11-08"],
+                     },
+                     "context_score_origin": "tool_estimate"},
             capability=_capability("CELLxGENE Census 2025-11-08 primary data", cells=True),
             data_version="Census:2025-11-08", code_version="2.1.0",
             parameters={"is_primary_data": True, "max_cells": context.task.constraints.dataset_selection.max_cells},
@@ -1597,6 +1629,15 @@ class SingleCellAnalysisTool(ScientificTool):
                     effect={"log2fc": lfc, "fdr": padj, "omics_strength": round(strength, 6)},
                     uncertainty="Pseudobulk differential expression is donor-aware but observational and not causal.",
                     quality_flags=["pseudobulk", "observational_not_causal"], context_match_score=0.9,
+                    context_match={
+                        "matched_disease": [context.task.context.disease] if context.task.context.disease else [],
+                        "matched_tissue": [context.task.context.tissue] if context.task.context.tissue else [],
+                        "matched_cell": [cell_type] if cell_type else [],
+                        "matched_assay": ["single-cell donor-level pseudobulk"],
+                        "source_fields": ["Census:2025-11-08", "local source matrix"],
+                        "context_score_origin": "tool_estimate",
+                        "tool_estimate": 0.9,
+                    },
                 ))
             summaries.append({
                 "source": info["source"], "cell_type": cell_type, "n_cells": cell_count,
@@ -1664,7 +1705,15 @@ class SingleCellAnalysisTool(ScientificTool):
             coverage_status=CoverageStatus.COVERED if covered else CoverageStatus.NOT_COVERED,
             context_match_score=0.9 if covered else 0.0,
             inputs={"omics_inputs": len(inputs), "census_expression_enabled": context.settings.enable_census_expression},
-            outputs={"omics_results": summaries, "formal_score_eligible": covered, "analysis_stage": "donor_level_pseudobulk"},
+            outputs={"omics_results": summaries, "formal_score_eligible": covered, "analysis_stage": "donor_level_pseudobulk",
+                     "context_match": {
+                         "matched_disease": [context.task.context.disease] if context.task.context.disease else [],
+                         "matched_tissue": [context.task.context.tissue] if context.task.context.tissue else [],
+                         "matched_cell": [context.task.context.cell_type] if context.task.context.cell_type else [],
+                         "matched_assay": ["single-cell donor-level pseudobulk"],
+                         "source_fields": ["Census:2025-11-08", "local source matrix"],
+                     },
+                     "context_score_origin": "tool_estimate"},
             candidate_genes=candidate_genes,
             capability=_capability("Standard H5AD/10x and optional Census donor-level pseudobulk", cells=True),
             data_version="Census:2025-11-08 or local-source-sha256", code_version="2.1.0",
@@ -1680,7 +1729,7 @@ class PathwayEnrichmentTool(ScientificTool):
     version = "2.1.0"
     descriptor = ToolDescriptor(
         tool_id=name, evidence_dimension="pathway",
-        description="Run preranked GSEA and ORA with the tested-gene background, fixed seed and recorded library date.",
+        description="Run preranked GSEA and ORA with the tested-gene background, fixed seed and recorded local library version/checksum.",
         input_types=["differential_result_artifact"], output_types=["pathway_result_artifact"],
         execution_policy="typed_wrapper", skills=[_skill("pathway-enrichment")],
     )
@@ -1696,6 +1745,19 @@ class PathwayEnrichmentTool(ScientificTool):
             import pandas as pd
         except ImportError:
             gp = pd = None
+        gseapy_version = "unknown"
+        gene_set_sha256: str | None = None
+        if gp is not None:
+            gseapy_version = str(getattr(gp, "__version__", "") or _package("gseapy") or "unknown")
+            try:
+                from gseapy import LIBRARY
+                gene_set_path = Path(LIBRARY) / "MSigDB_Hallmark_2020.gmt"
+                if gene_set_path.is_file():
+                    gene_set_sha256 = _sha256(gene_set_path)[:12]
+            except Exception:
+                gene_set_sha256 = None
+        library_ref = gene_set_sha256 or "local-library"
+        data_version = f"MSigDB_Hallmark_2020:gseapy:{gseapy_version}:{library_ref}"
         if gp is not None:
             for row in result_rows:
                 source = context.run_dir / row["result_artifact"]["uri"]
@@ -1803,12 +1865,25 @@ class PathwayEnrichmentTool(ScientificTool):
             status=ToolStatus.SUCCESS if summaries else ToolStatus.PARTIAL,
             coverage_status=CoverageStatus.COVERED if summaries else CoverageStatus.NOT_COVERED,
             context_match_score=0.85 if summaries else 0.0,
-            inputs={"bulk_result_count": len(result_rows)}, outputs={"pathway_results": summaries},
+            inputs={"bulk_result_count": len(result_rows)},
+            outputs={"pathway_results": summaries,
+                     "context_match": {
+                         "matched_disease": [context.task.context.disease] if context.task.context.disease else [],
+                         "matched_tissue": [context.task.context.tissue] if context.task.context.tissue else [],
+                         "matched_cell": [context.task.context.cell_type] if context.task.context.cell_type else [],
+                         "matched_assay": ["preranked GSEA/ORA on MSigDB_Hallmark_2020"],
+                         "source_fields": ["gseapy local library"],
+                     },
+                     "context_score_origin": "tool_estimate"},
             capability=_capability("Preranked GSEA plus ORA with an explicit tested-gene background"),
-            data_version=f"MSigDB_Hallmark_2020:retrieved:{utc_now()[:10]}", code_version="2.1.0",
+            data_version=data_version, code_version="2.1.0",
             parameters={"permutations": context.settings.gsea_permutations, "seed": context.settings.random_seed, "min_size": 15, "max_size": 500},
             artifacts=artifacts, warnings=warnings,
-            limitations=["Online gene-set libraries can drift; retrieval date and complete output are retained."],
+            limitations=[
+                "Pathway enrichment uses gseapy's local bundled MSigDB_Hallmark_2020 gene-set library; "
+                "no online retrieval was performed and results depend on the installed gseapy library version "
+                "and gene-set file checksum."
+            ],
         )
         return ToolExecution(result=result, evidence=[])
 

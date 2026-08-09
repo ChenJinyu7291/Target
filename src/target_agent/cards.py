@@ -1,7 +1,7 @@
 """TargetCard and falsifiable experiment-plan construction."""
 from __future__ import annotations
 
-from .contracts import ExperimentOutcome, ExperimentPlan, TargetCard, TaskSpec
+from .contracts import ExperimentOutcome, ExperimentPlan, TargetCard, TaskSpec, TerminalStatus
 from .ranking import RankedTarget
 
 
@@ -35,17 +35,30 @@ def experiment_plan(task: TaskSpec, target: RankedTarget) -> ExperimentPlan:
     )
 
 
-def build_cards(task: TaskSpec, ranked: list[RankedTarget]) -> list[TargetCard]:
+def build_cards(task: TaskSpec, ranked: list[RankedTarget],
+                terminal_status: TerminalStatus | None = None) -> list[TargetCard]:
     cards = []
     for rank, target in enumerate(ranked[: task.constraints.max_target_cards], start=1):
+        decision = target.decision
+        limitations = ["Ranking score is a prioritization score, not a probability of clinical success."]
+        if terminal_status is not None and terminal_status != TerminalStatus.COMPLETED:
+            if decision == "GO":
+                decision = "CONDITIONAL_GO"
+            limitations.append(
+                f"GAPS: terminal status is {terminal_status.value}; unconditional GO is not allowed."
+            )
+        limitations.append(
+            f"Context score source: {target.context_score_origin} "
+            "(deterministic recomputation; tool self-reports are estimates only)."
+        )
         cards.append(TargetCard(
-            gene_symbol=target.gene, rank=rank, decision=target.decision,
+            gene_symbol=target.gene, rank=rank, decision=decision,
             scores=target.scores, evidence_ids=target.evidence_ids,
             supporting_evidence_ids=target.supporting_ids, opposing_evidence_ids=target.opposing_ids,
             safety_blockers=target.safety_blockers, evidence_gaps=target.evidence_gaps,
             matched_drugs=target.matched_drugs,
             genetic_evidence_summary=target.genetic_evidence_summary,
             experiment_plan=experiment_plan(task, target),
-            limitations=["Ranking score is a prioritization score, not a probability of clinical success."],
+            limitations=limitations,
         ))
     return cards

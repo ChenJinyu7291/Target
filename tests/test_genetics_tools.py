@@ -301,6 +301,9 @@ def test_ranking_ignores_free_form_and_database_aggregate_genetic_scores():
     )
     context_mismatch = rank_targets(
         ["IL6"], [low_context_item], [],
+        task_context=TaskContext(
+            disease="rheumatoid arthritis", genome_build="GRCh38", ancestry="EUR",
+        ),
     )[0]
     assert raw.scores.human_genetics == 0
     assert aggregate.scores.human_genetics == 0
@@ -462,9 +465,11 @@ def test_unresolved_reviewer_finding_downgrades_target_decision():
         statement="A source-grounded paper discusses IL6 in the requested disease context.",
         source=SourceLocator(
             uri="https://europepmc.org/article/MED/1", source_id="PMID:1", chunk_id="abstract-1",
+            version="fixture-1",
         ),
         source_span="IL6 disease context", context=EvidenceContext(disease="lung adenocarcinoma"),
-        stance=Stance.SUPPORTS, uncertainty="Literature association is not causal.",
+        stance=Stance.SUPPORTS, effect_direction="increase",
+        uncertainty="Literature association is not causal.",
         context_match_score=1.0,
     )
     baseline = rank_targets(["IL6"], [formal, literature], [])[0]
@@ -508,9 +513,11 @@ def test_upstream_genetics_finding_downgrades_downstream_target_decision():
         statement="A source-grounded paper discusses IL6 in the requested disease context.",
         source=SourceLocator(
             uri="https://europepmc.org/article/MED/1", source_id="PMID:1", chunk_id="abstract-1",
+            version="fixture-1",
         ),
         source_span="IL6 disease context", context=EvidenceContext(disease="lung adenocarcinoma"),
-        stance=Stance.SUPPORTS, uncertainty="Literature association is not causal.",
+        stance=Stance.SUPPORTS, effect_direction="increase",
+        uncertainty="Literature association is not causal.",
         context_match_score=1.0,
     )
     finding = ReviewerFinding(

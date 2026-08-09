@@ -29,6 +29,7 @@ class ClaimClass(str, Enum):
     FACT = "FACT"
     OBSERVED = "OBSERVED"
     PREDICTED = "PREDICTED"
+    UNVERIFIED = "UNVERIFIED"
     INFERRED = "INFERRED"
 
 
@@ -422,6 +423,8 @@ class SourceLocator(ContractModel):
     uri: str = Field(min_length=1)
     source_id: str = Field(min_length=1)
     version: str | None = None
+    sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    version_meta: dict[str, Any] | None = None
     section: str | None = None
     chunk_id: str | None = None
     start_char: int | None = Field(default=None, ge=0)
@@ -511,6 +514,10 @@ class EvidenceItem(ContractModel):
     uncertainty: str = Field(min_length=1)
     quality_flags: list[str] = Field(default_factory=list)
     context_match_score: float = Field(ge=0.0, le=1.0)
+    # Tool-supplied match evidence (matched disease/tissue/cell/assay terms and
+    # source fields). This is never the final score: formal ranking and the
+    # reviewer recompute the score deterministically from this metadata.
+    context_match: dict[str, Any] | None = None
     genetic_evidence: GeneticEvidencePayload | None = None
 
     @model_validator(mode="after")

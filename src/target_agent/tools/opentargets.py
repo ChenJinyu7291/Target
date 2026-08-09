@@ -236,9 +236,9 @@ class OpenTargetsTool(ScientificTool):
             if genetic_association > 0:
                 span = f"disease={resolved_disease_id}|target={target.get('id')}|genetic_association_score={genetic_association}"
                 evidence.append(EvidenceItem(
-                    tool_run_id=run_id, gene_symbol=gene, claim_class=ClaimClass.FACT,
+                    tool_run_id=run_id, gene_symbol=gene, claim_class=ClaimClass.INFERRED,
                     statement=f"Open Targets reports a human-genetic association score of {genetic_association:.3g} for {gene} and {disease['name']}.",
-                    source=SourceLocator(uri=f"https://platform.opentargets.org/disease/{resolved_disease_id}/associations", source_id=resolved_disease_id, version="live-or-cache", section="associatedTargets", chunk_id=f"ot-genetics-{gene}"),
+                    source=SourceLocator(uri=f"https://platform.opentargets.org/disease/{resolved_disease_id}/associations", source_id=resolved_disease_id, version="live-or-cache", section="associatedTargets", chunk_id=f"ot-genetics-{gene}", version_meta={"data_version": "OpenTargets:live-or-cache", "cached": cached, "section": "associatedTargets"}),
                     source_span=span,
                     context=EvidenceContext(organism="Homo sapiens", disease=disease["name"], assay="Open Targets evidence aggregation"),
                     stance=Stance.SUPPORTS,
@@ -249,6 +249,12 @@ class OpenTargetsTool(ScientificTool):
                     ),
                     quality_flags=["database_aggregate_score", "not_formal_human_genetics"],
                     context_match_score=0.9,
+                    context_match={
+                        "matched_disease": [disease["name"]], "matched_tissue": [],
+                        "matched_cell": [], "matched_assay": ["Open Targets evidence aggregation"],
+                        "source_fields": ["associatedTargets"], "context_score_origin": "tool_estimate",
+                        "tool_estimate": 0.9,
+                    },
                     genetic_evidence=GeneticEvidencePayload(
                         evidence_type="open_targets_genetic_association",
                         analysis_level="database_aggregate",
@@ -261,7 +267,7 @@ class OpenTargetsTool(ScientificTool):
                 ))
             if somatic_mutation > 0:
                 evidence.append(EvidenceItem(
-                    tool_run_id=run_id, gene_symbol=gene, claim_class=ClaimClass.FACT,
+                    tool_run_id=run_id, gene_symbol=gene, claim_class=ClaimClass.INFERRED,
                     statement=(
                         f"Open Targets reports a somatic-mutation evidence score of "
                         f"{somatic_mutation:.3g} for {gene} and {disease['name']}."
@@ -270,6 +276,7 @@ class OpenTargetsTool(ScientificTool):
                         uri=f"https://platform.opentargets.org/disease/{resolved_disease_id}/associations",
                         source_id=resolved_disease_id, version="live-or-cache",
                         section="associatedTargets", chunk_id=f"ot-somatic-{gene}",
+                        version_meta={"data_version": "OpenTargets:live-or-cache", "cached": cached, "section": "associatedTargets"},
                     ),
                     source_span=(
                         f"disease={resolved_disease_id}|target={target.get('id')}|"
@@ -286,18 +293,30 @@ class OpenTargetsTool(ScientificTool):
                     ),
                     quality_flags=["database_aggregate_score", "somatic_not_germline_genetics"],
                     context_match_score=0.9,
+                    context_match={
+                        "matched_disease": [disease["name"]], "matched_tissue": [],
+                        "matched_cell": [], "matched_assay": ["Open Targets evidence aggregation"],
+                        "source_fields": ["associatedTargets"], "context_score_origin": "tool_estimate",
+                        "tool_estimate": 0.9,
+                    },
                 ))
             for drug in known_drugs[:5]:
                 span = f"target={target.get('id')}|drug={drug.get('drugId')}|clinical_stage={drug.get('phase')}|status={drug.get('status')}"
                 evidence.append(EvidenceItem(
-                    tool_run_id=run_id, gene_symbol=gene, claim_class=ClaimClass.FACT,
+                    tool_run_id=run_id, gene_symbol=gene, claim_class=ClaimClass.INFERRED,
                     statement=f"Open Targets links {drug.get('prefName')} ({drug.get('drugId')}) to {gene}; reported clinical stage {drug.get('phase')}.",
-                    source=SourceLocator(uri=f"https://platform.opentargets.org/target/{target.get('id')}", source_id=str(drug.get("drugId")), version="live-or-cache", section="knownDrugs", chunk_id=f"ot-drug-{gene}-{drug.get('drugId')}"),
+                    source=SourceLocator(uri=f"https://platform.opentargets.org/target/{target.get('id')}", source_id=str(drug.get("drugId")), version="live-or-cache", section="knownDrugs", chunk_id=f"ot-drug-{gene}-{drug.get('drugId')}", version_meta={"data_version": "OpenTargets:live-or-cache", "cached": cached, "section": "knownDrugs"}),
                     source_span=span,
                     context=EvidenceContext(organism="Homo sapiens", disease=disease["name"], assay="Open Targets known drugs"),
                     stance=Stance.SUPPORTS, effect={"drug": drug},
                     uncertainty="Drug-target linkage does not establish efficacy in the requested disease context.",
                     quality_flags=["drug_link_not_disease_efficacy"], context_match_score=0.8,
+                    context_match={
+                        "matched_disease": [disease["name"]], "matched_tissue": [],
+                        "matched_cell": [], "matched_assay": ["Open Targets known drugs"],
+                        "source_fields": ["knownDrugs"], "context_score_origin": "tool_estimate",
+                        "tool_estimate": 0.8,
+                    },
                 ))
             for liability in profile.get("safety_liabilities", [])[:3]:
                 event = liability.get("event") or liability.get("eventId") or "unspecified safety liability"
@@ -306,18 +325,25 @@ class OpenTargetsTool(ScientificTool):
                     f"literature={liability.get('literature')}"
                 )
                 evidence.append(EvidenceItem(
-                    tool_run_id=run_id, gene_symbol=gene, claim_class=ClaimClass.FACT,
+                    tool_run_id=run_id, gene_symbol=gene, claim_class=ClaimClass.INFERRED,
                     statement=f"Open Targets records a safety liability for {gene}: {event}.",
                     source=SourceLocator(
                         uri=liability.get("url") or f"https://platform.opentargets.org/target/{target.get('id')}",
                         source_id=str(liability.get("eventId") or target.get("id")), version="live-or-cache",
                         section="safetyLiabilities", chunk_id=f"ot-safety-{gene}-{liability.get('eventId') or 'event'}",
+                        version_meta={"data_version": "OpenTargets:live-or-cache", "cached": cached, "section": "safetyLiabilities"},
                     ),
                     source_span=span,
                     context=EvidenceContext(organism="Homo sapiens", disease=disease["name"], assay="Open Targets safety liability"),
                     stance=Stance.REFUTES, effect={"safety": liability},
                     uncertainty="A recorded liability is a risk signal; relevance depends on modality, exposure and tissue.",
                     quality_flags=["safety_blocker_retained"], context_match_score=0.8,
+                    context_match={
+                        "matched_disease": [disease["name"]], "matched_tissue": [],
+                        "matched_cell": [], "matched_assay": ["Open Targets safety liability"],
+                        "source_fields": ["safetyLiabilities"], "context_score_origin": "tool_estimate",
+                        "tool_estimate": 0.8,
+                    },
                 ))
         aggregate_covered = bool(associations)
         inherited_covered = any(row["genetic_association_score"] > 0 for row in associations)
@@ -341,7 +367,13 @@ class OpenTargetsTool(ScientificTool):
                          for row in sorted(
                              associations, key=lambda row: row["genetic_association_score"], reverse=True,
                          ) if row["genetic_association_score"] > 0
-                     ][:10]
+                     ][:10],
+                     "context_match": {
+                         "matched_disease": [disease["name"]], "matched_tissue": [],
+                         "matched_cell": [], "matched_assay": ["Open Targets evidence aggregation"],
+                         "source_fields": ["associatedTargets", "knownDrugs", "safetyLiabilities"],
+                     },
+                     "context_score_origin": "tool_estimate"
                      },
             candidate_genes=[
                 row["gene"] for row in sorted(

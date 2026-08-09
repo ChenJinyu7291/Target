@@ -2,7 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { Presentation, PresentationFile } from "@oai/artifact-tool";
 
-const ROOT = process.env.TARGET_REPO || "G:/deepcamp/Target";
+const ROOT = process.env.TARGET_REPO || "";
+if (!ROOT) {
+  throw new Error("TARGET_REPO must point to the Target repository root when building this report");
+}
 const REPORT = path.join(ROOT, "reports/full_benchmark_20260808");
 const FIG = path.join(REPORT, "figures");
 const OUT = path.join(REPORT, "Target_project_full_visualization_20260808.pptx");

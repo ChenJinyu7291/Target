@@ -125,7 +125,7 @@ class ClinicalTrialsGovTool(ScientificTool):
                             flags.append(f"stopped_reason:{status_mod['whyStopped'][:80]}")
                     span = f"{nct}|{overall}|{phase}|{iv_names}"
                     evidence.append(EvidenceItem(
-                        tool_run_id=run_id, gene_symbol=gene, claim_class=ClaimClass.FACT,
+                        tool_run_id=run_id, gene_symbol=gene, claim_class=ClaimClass.INFERRED,
                         statement=(f"Clinical trial {nct} ({phase}, {overall}) evaluates "
                                    f"{iv_names} in {disease}; the record explicitly names {gene}."),
                         source=SourceLocator(
@@ -133,6 +133,11 @@ class ClinicalTrialsGovTool(ScientificTool):
                             version=status_mod.get("lastUpdateSubmitDate", ""),
                             section="registry_record", chunk_id=f"ctgov-{nct}-{gene}",
                             start_char=0, end_char=len(span),
+                            version_meta={
+                                "data_version": "ClinicalTrials.gov:live-or-cache",
+                                "cached": cached_any,
+                                "last_update_submit_date": status_mod.get("lastUpdateSubmitDate", ""),
+                            },
                         ),
                         source_span=span,
                         context=EvidenceContext(disease=disease, assay="clinical trial registry"),
@@ -140,6 +145,13 @@ class ClinicalTrialsGovTool(ScientificTool):
                         effect_direction="unclear", effect={"phase": phase, "status": overall},
                         uncertainty="Registry records show trial existence and phase, not efficacy; intervention-target mapping is name-based.",
                         quality_flags=flags, context_match_score=0.8,
+                        context_match={
+                            "matched_disease": [disease] if disease else [],
+                            "matched_tissue": [], "matched_cell": [],
+                            "matched_assay": ["clinical trial registry"],
+                            "source_fields": ["registry_record"], "context_score_origin": "tool_estimate",
+                            "tool_estimate": 0.8,
+                        },
                     ))
         except (requests.RequestException, ValueError, OSError) as exc:
             return ToolExecution(result=ToolResult(
@@ -159,7 +171,14 @@ class ClinicalTrialsGovTool(ScientificTool):
             inputs=inputs,
             outputs={"genes_queried": queried, "studies_seen": studies_seen,
                      "gene_named_claims": len(evidence),
-                     "retrieval_hits_are_evidence": False},
+                     "retrieval_hits_are_evidence": False,
+                     "context_match": {
+                         "matched_disease": [disease] if disease else [],
+                         "matched_tissue": [], "matched_cell": [],
+                         "matched_assay": ["clinical trial registry"],
+                         "source_fields": ["registry_record"],
+                     },
+                     "context_score_origin": "tool_estimate"},
             capability=capability, data_version="ClinicalTrials.gov:live-or-cache", code_version="1.0.0",
             parameters={"api": "v2", "page_size": self.page_size},
             artifacts=[], evidence_ids=[item.evidence_id for item in evidence],

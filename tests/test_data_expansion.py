@@ -70,7 +70,7 @@ def test_clinical_trials_gene_named_only(tmp_path):
     # 只有干预/标题显式命名 IL2 的记录能成为证据
     assert len(out.evidence) == 1
     ev = out.evidence[0]
-    assert ev.gene_symbol == "IL2" and ev.claim_class.value == "FACT"
+    assert ev.gene_symbol == "IL2" and ev.claim_class.value == "INFERRED"
     assert ev.source.uri == "https://clinicaltrials.gov/study/NCT00000001"
     assert "Phase 2" in ev.statement
 

@@ -7,17 +7,79 @@ let currentSessionId = null;
 let currentSessionRole = 'researcher';
 let pollTimer = null;
 let kernelId = null;
+let capabilities = null;
+let webToken = localStorage.getItem('target_agent_web_token') || '';
+let tokenPromptPromise = null;
 
 async function api(path, options) {
-  const response = await fetch(path, options);
+  const init = Object.assign({}, options);
+  const headers = new Headers(init.headers || {});
+  if (webToken) headers.set('Authorization', 'Bearer ' + webToken);
+  init.headers = headers;
+  const response = await fetch(path, init);
   let payload = null;
   try { payload = await response.json(); } catch (_) { payload = null; }
+  if (response.status === 401 && payload && payload.error === 'unauthorized') {
+    const token = await requestWebToken();
+    if (token) return api(path, options);
+    const err = new Error(payload.error || 'unauthorized');
+    err.unauthorized = true;
+    throw err;
+  }
   if (!response.ok) {
     const err = new Error(payload && payload.error ? payload.error : `HTTP ${response.status}`);
     if (payload && payload.review_notes) err.review_notes = payload.review_notes;
+    if (payload && payload.detail) {
+      err.detail = payload.detail;
+      err.message = `${err.message}：${payload.detail}`;
+    }
     throw err;
   }
   return payload;
+}
+
+function requestWebToken() {
+  if (!tokenPromptPromise) {
+    tokenPromptPromise = showWebTokenPrompt();
+    tokenPromptPromise.finally(() => { tokenPromptPromise = null; });
+  }
+  return tokenPromptPromise;
+}
+
+function showWebTokenPrompt() {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'token-overlay';
+    overlay.innerHTML = `
+      <div class="token-dialog" role="dialog" aria-modal="true" aria-label="Web access token">
+        <h3>Access token required</h3>
+        <p class="muted">This service requires the token configured via TARGET_AGENT_WEB_TOKEN.</p>
+        <input id="token-input" type="password" placeholder="Bearer token" autocomplete="off" />
+        <div class="token-actions">
+          <button id="token-cancel" class="ghost" type="button">Cancel</button>
+          <button id="token-save" class="primary" type="button">Save and continue</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const input = overlay.querySelector('#token-input');
+    const finish = (value) => { overlay.remove(); resolve(value); };
+    overlay.querySelector('#token-save').addEventListener('click', () => {
+      const value = input.value.trim();
+      if (!value) { input.focus(); return; }
+      webToken = value;
+      localStorage.setItem('target_agent_web_token', value);
+      finish(value);
+    });
+    overlay.querySelector('#token-cancel').addEventListener('click', () => finish(null));
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) finish(null);
+    });
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') overlay.querySelector('#token-save').click();
+      if (event.key === 'Escape') finish(null);
+    });
+    input.focus();
+  });
 }
 
 function esc(value) {
@@ -31,6 +93,12 @@ function esc(value) {
 
 function roleLabel(role) {
   return role === 'viewer' ? '只读查看' : role === 'reviewer' ? '审阅者' : role === 'admin' ? '管理员' : '研究员';
+}
+
+function currentActor() {
+  if (!currentSessionId) return null;
+  if (currentSessionRole === 'viewer') return null;
+  return currentSessionRole;
 }
 
 function toast(message, kind = 'success') {
@@ -92,10 +160,12 @@ function lineageIds(snap, itemId) {
 async function refreshCapabilities() {
   try {
     const caps = await api('/api/capabilities');
+    capabilities = caps;
     const backends = Object.entries(caps.analysis_backends || {})
       .filter(([, enabled]) => enabled).map(([name]) => name).join(', ') || '无';
     const kernelOn = !!(caps.kernels && caps.kernels.enabled);
-    $('capability').textContent = `研究合同 ${caps.research_contract_version || '?'} · 后端 ${backends} · 技能库 ${(caps.skills && caps.skills.count) || 0} · 内核 ${kernelOn ? '开' : '关'}`;
+    $('capability').textContent = `科学合同 ${caps.contract_version || '?'} · 项目合同 ${caps.research_contract_version || '?'} · 后端 ${backends} · 技能库 ${(caps.skills && caps.skills.count) || 0} · 内核 ${kernelOn ? '开' : '关'}`;
+    refreshCreatePreview();
   } catch (error) {
     $('capability').textContent = '系统能力不可用';
   }
@@ -257,6 +327,37 @@ async function selectProject(projectId) {
 let draftQuestion = null; // { goal_question, task_question, original_question }
 let workflowTemplates = {}; // template_id -> {source_sha256, domain, modules, ...}
 
+function projectDefaultsFor(workflowId) {
+  const template = workflowTemplates[workflowId] || {};
+  const limits = (capabilities && capabilities.limits) || {};
+  return {
+    contract_version: (capabilities && capabilities.research_contract_version) || undefined,
+    task_contract_version: (capabilities && capabilities.contract_version) || undefined,
+    max_work_items: template.max_work_items || undefined,
+    max_replans: undefined,
+    max_forks: undefined,
+    max_tool_calls: limits.max_tool_calls || undefined,
+  };
+}
+
+function refreshCreatePreview() {
+  const host = $('create-preview');
+  if (!host) return;
+  const workflowId = $('workflow').value || 'disease_to_target';
+  const defaults = projectDefaultsFor(workflowId);
+  const template = workflowTemplates[workflowId] || {};
+  const modules = (template.modules || []).join('、') || '默认模板';
+  const maxWorkItems = defaults.max_work_items || '默认';
+  const maxToolCalls = defaults.max_tool_calls || '默认';
+  const autonomy = $('autonomy').value;
+  const modeNote = autonomy === 'checkpointed'
+    ? '关键节点审批：计划与发布需要人工批准'
+    : autonomy === 'supervised'
+      ? '逐步审批：每个工作项都需要人工批准'
+      : '全自动：创建后将自动执行';
+  host.textContent = `模板模块：${modules} · 限额：最多 ${maxWorkItems} 个工作项 / ${maxToolCalls} 次工具调用 · ${modeNote}`;
+}
+
 function buildProjectSpec() {
   const value = (id) => $(id).value.trim();
   const workflowId = value('workflow') || 'disease_to_target';
@@ -274,8 +375,9 @@ function buildProjectSpec() {
   const question = draftQuestion
     ? draftQuestion.goal_question
     : (rawQuestion || (disease ? `Which mechanisms and drug targets are supported by public evidence for ${disease}?` : 'Research question'));
+  const defaults = projectDefaultsFor(workflowId);
   const base = {
-    contract_version: '3.0.0',
+    contract_version: defaults.contract_version,
     project_id: `project-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
     title: workflowId === 'literature_review' ? `${disease || 'literature'} research review` : `${disease} target discovery`,
     domain: template.domain || (workflowId === 'literature_review' ? 'life_science' : 'disease_target_discovery'),
@@ -286,9 +388,9 @@ function buildProjectSpec() {
       constraints: ['Only public data and allowlisted tools may be used.'],
     },
     autonomy_mode: value('autonomy'),
-    max_work_items: 12,
-    max_replans: 2,
-    max_forks: 4,
+    max_work_items: defaults.max_work_items,
+    max_replans: defaults.max_replans,
+    max_forks: defaults.max_forks,
     workflow_template: workflowId,
     workflow_template_sha256: template.source_sha256 || null,
   };
@@ -301,7 +403,7 @@ function buildProjectSpec() {
     preferred_dataset_accessions: accessions,
     literature_query: `${disease} mechanism and drug targets`,
     target_task_spec: {
-      contract_version: '2.2.0',
+      contract_version: defaults.task_contract_version,
       task_type: 'disease_to_target',
       question: draftQuestion ? draftQuestion.task_question : `Which mechanisms and drug targets are supported by public evidence for ${disease}?`,
       context: {
@@ -338,6 +440,7 @@ async function loadWorkflows() {
     }
     const saved = workflowTemplates['disease_to_target'];
     if (saved) select.value = 'disease_to_target';
+    refreshCreatePreview();
   } catch (error) {
     console.warn('workflow catalog unavailable:', error);
   }
@@ -392,6 +495,20 @@ async function createProject() {
     toast('请填写研究问题或疾病名称', 'error');
     return;
   }
+  const defaults = projectDefaultsFor(workflowId);
+  const template = workflowTemplates[workflowId] || {};
+  const modules = (template.modules || []).join('、') || '默认模板';
+  const autonomy = $('autonomy').value;
+  const modeNote = autonomy === 'checkpointed'
+    ? '关键节点审批：计划与发布需要人工批准'
+    : autonomy === 'supervised'
+      ? '逐步审批：每个工作项都需要人工批准'
+      : '全自动：创建后将自动执行（非关键节点审批模式）';
+  const summary = `模板模块：${modules}\n限额：最多 ${defaults.max_work_items || '默认'} 个工作项 / ${defaults.max_tool_calls || '默认'} 次工具调用\n${modeNote}\n\n确定创建并启动项目？`;
+  if (!window.confirm(summary)) return;
+  const button = $('create');
+  button.disabled = true;
+  button.textContent = '正在创建…';
   try {
     const created = await api('/api/projects', {
       method: 'POST',
@@ -403,6 +520,9 @@ async function createProject() {
     await selectProject(created.project_id);
   } catch (error) {
     toast(error.message, 'error');
+  } finally {
+    button.disabled = false;
+    button.textContent = '创建并启动项目';
   }
 }
 
@@ -490,7 +610,11 @@ function renderNextActions(snap) {
 
 async function runAction(snap, action, approve) {
   const projectId = snap.spec.project_id;
-  const actor = 'reviewer';
+  const actor = currentActor();
+  if (!actor) {
+    toast('请先选择或新建一个可审批会话（研究员/审阅者/管理员）', 'error');
+    return;
+  }
   try {
     if (action.action === 'accept_checkpoint') {
       await api(`/api/projects/${projectId}/decisions`, {
@@ -661,13 +785,18 @@ function renderBranches(snap) {
 }
 
 async function decideFork(projectId, branchId, approve) {
+  const actor = currentActor();
+  if (!actor) {
+    toast('请先选择或新建一个可审批会话（研究员/审阅者/管理员）', 'error');
+    return;
+  }
   try {
     await api(`/api/projects/${projectId}/forks/${branchId}/decision`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         approve,
-        actor: 'reviewer',
+        actor,
         rationale: approve ? 'Approve the rollback branch.' : 'Reject the rollback branch.',
       }),
     });
@@ -943,7 +1072,7 @@ async function runSessionIntervention(snap, action, approve) {
     const body = {
       action: action.action,
       rationale,
-      actor: 'reviewer',
+      actor: currentSessionRole,
       target_id: targetId,
     };
     if (action.action === 'decide_repair') {
@@ -992,7 +1121,7 @@ async function runSessionSupplement() {
       body: JSON.stringify({
         action: 'propose_fork',
         rationale,
-        actor: 'researcher',
+        actor: currentSessionRole,
         target_id: targetItem,
         mode: 'redo',
         input_overrides: overrides,
@@ -1035,6 +1164,8 @@ async function init() {
   $('fork-mode').addEventListener('change', () => {
     if (currentSnapshot) renderForkAttempts(currentSnapshot);
   });
+  $('workflow').addEventListener('change', refreshCreatePreview);
+  $('autonomy').addEventListener('change', refreshCreatePreview);
   $('kernel-start').addEventListener('click', startKernel);
   $('kernel-stop').addEventListener('click', stopKernel);
   $('kernel-run').addEventListener('click', runKernelCode);

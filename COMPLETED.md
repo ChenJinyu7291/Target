@@ -203,7 +203,7 @@ typed transient failure
 - 真实 fine-mapping/coloc 重算和广泛适用的扰动 Oracle；
 - 大规模、多疾病、独立专家审核的 alignment 数据；
 - 外部隐藏疾病盲测与独立专家仲裁；
-- 生产级多用户认证、租户隔离和 Streamable HTTP MCP；
+- 生产级多用户认证与租户隔离（Streamable HTTP transport 基础版已完成，见 §12；认证/多租户未完成）；
 - 自动湿实验、临床决策或自修改系统。
 
 后续优先级与验收标准见 [PRD.md](PRD.md)，可视化状态页见 [product_status.html](product_status.html)。
@@ -396,3 +396,18 @@ typed transient failure
   but TraceEvent.event_type did not allow them, crashing the child runtime with ValidationError at
   intake. Both types are now part of the contract, with a regression test over the hinted-planner
   path. Full remote suite: 430 passed / 0 failed / 2 skipped; repo policy OK; deployment assets 32/32.
+
+## 19. 2026-08-09 全项目审计与修复轮
+
+- 四份审计报告已写入 `../review/`：产品（[audit_product.md](../review/audit_product.md)）、科学（[audit_scientific.md](../review/audit_scientific.md)）、架构（[audit_architecture.md](../review/audit_architecture.md)）、安全（[audit_security.md](../review/audit_security.md)）；对应修复任务见 [task_impl_product.md](../review/task_impl_product.md)、[task_impl_architecture.md](../review/task_impl_architecture.md)、[task_impl_security.md](../review/task_impl_security.md) 与科学审计任务 [task_audit_scientific.md](../review/task_audit_scientific.md)。
+- 产品修复轮（impl_product）覆盖：CLI 补齐 fork/branch/session 子命令；Web 工作台错误 detail 展示、创建防抖与二次确认、审批角色接线、合同版本能力条；文档一致性（README / DEMO_GUIDE / COMPLETED / PRODUCT_REFACTOR / PRODUCT_RECONSTRUCTION / product_status.html）；首个 GitHub Actions CI 门禁（`.github/workflows/ci.yml`，由父任务统一评审）；benchmark 过期报告标注与远程重跑命令（`../review/benchmark_rerun.pbs`）。
+- 本仓库 Streamable HTTP MCP 状态统一为：**基础 transport 已完成（本地/可信网络绑定）**；认证、多租户与生产级发布未完成。
+
+### 19.1 2026-08-09 第三轮全量检验与修复封口
+- 第一轮全量 pytest（430 tests）1日发现 25 失败，经修复与第二轮失败集重跑后仅剩 2 项；第三轮完成两项最终修复：
+  - 修复闭环实质复查（`_finding_recheck_substance`）按 finding 记录的实际类别执行检查：纯 coverage-gap 补充不再被 missing-provenance 的原始质症检查错误拦截，而真正的 provenance 缺失 finding 仍保持实质检查；
+  - restore fork 的 head-backed 恢复 attempt 记载到活动 fork 点下，统一了旧测试与新恢复设计的记账期望（基础项保持单条历史 attempt，活动 fork 点为 2 条：redo attempt + restore attempt）；
+- 全量远程 pytest 重跑：**507 passed / 0 failed / 2 skipped**（-qq 模式，无摘要行，以进度序列和退出码确认）；repo policy 门禁 OK；
+- benchmark 重跑刷新：13 tasks / 29 assertions / score 1.0（BM-01~BM-13 全 PASS），`benchmark/results/benchmark_report.{json,md}` 已同步；
+- 修复 benchmark 脚本将 pytest/policy 日志写入仓库内 `review/` 的问题：日志输出改为 WORKDIR 同级 `review/`（仓库外），避免远程执行资产（绝对路径/主机名）进入仓库并触发策略门禁；
+- 本轮未推送；合并/发布保留给团队评审。

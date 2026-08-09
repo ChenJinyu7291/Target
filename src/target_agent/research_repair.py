@@ -1106,6 +1106,174 @@ def chain_final_replacement(
     return final
 
 
+# Reverse map: a single deterministic repair action may serve several typed
+# finding categories; the recheck runs every category the action could have
+# been proposed for (conservative when the request carries no category).
+FINDING_ACTION_TO_CATEGORIES: dict[RepairAction, tuple[str, ...]] = {
+    RepairAction.DOWNGRADE_CLAIM: ("causal_overreach", "gene_mapping_overreach", "evidence_dependence"),
+    RepairAction.SUPPLEMENT_EVIDENCE: ("coverage_gap", "missing_provenance"),
+    RepairAction.EXCLUDE_EVIDENCE: ("context_mismatch", "conflicting_evidence", "dataset_ineligibility"),
+    RepairAction.SPLIT_CONTEXT_SAME_SCOPE: ("context_split_needed",),
+    RepairAction.SWITCH_DATASET_SAME_CONTEXT: ("dataset_ineligibility",),
+}
+
+
+def _selected_accessions(result: WorkItemResult) -> set[str]:
+    """Collect accession/dataset ids the recomputed result actually selected."""
+    selected: set[str] = set()
+
+    def visit(value: Any, depth: int = 0) -> None:
+        if depth > 4:
+            return
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key in {"accession", "dataset_id", "dataset_accession"} and isinstance(item, str) and item:
+                    selected.add(item)
+                else:
+                    visit(item, depth + 1)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item, depth + 1)
+
+    visit(result.outputs)
+    return selected
+
+
+def _finding_recheck_substance(
+    request: RepairRequest, result: WorkItemResult,
+) -> tuple[dict[str, dict[str, Any]], bool]:
+    """Re-examine the original finding's substantive allegation against the recomputed result.
+
+    Returns (finding_id -> {finding_id, categories, checks, passed}, all_passed).
+    A typed status gate alone can never close this loop.
+    """
+    action = request.action
+    payload = request.directive_payload
+    if action == RepairAction.SWITCH_DATASET_SAME_CONTEXT:
+        finding_id = "dataset-selection"
+        categories = ("dataset_ineligibility",)
+    else:
+        finding_id = str(payload.get("finding_id") or "untyped-finding")
+        categories = FINDING_ACTION_TO_CATEGORIES.get(action, ())
+    checks: list[str] = []
+    passed = True
+    outputs = result.outputs or {}
+    if action != RepairAction.SWITCH_DATASET_SAME_CONTEXT and finding_id != "untyped-finding":
+        # Scope the recheck to the original finding's typed category when the
+        # repaired result still carries the finding record. Running every
+        # category an action may serve would demand unrelated checks (for
+        # example provenance for a pure coverage-gap supplement).
+        action_categories = FINDING_ACTION_TO_CATEGORIES.get(action, ())
+        for row in outputs.get("domain_findings") or []:
+            if (
+                isinstance(row, dict)
+                and str(row.get("finding_id") or "") == finding_id
+                and str(row.get("category") or "") in action_categories
+            ):
+                categories = (str(row["category"]),)
+                break
+    evidence_items = {
+        str(row.get("evidence_id") or ""): row
+        for row in outputs.get("evidence_items") or []
+        if isinstance(row, dict) and row.get("evidence_id")
+    }
+    active_refs = set(result.evidence_refs or [])
+    excluded = [str(value) for value in payload.get("evidence_refs") or []]
+
+    if action == RepairAction.SWITCH_DATASET_SAME_CONTEXT:
+        replacement = payload.get("replacement_dataset") or {}
+        replacement_acc = str(replacement.get("accession") or replacement.get("dataset_id") or "")
+        excluded_accs = {str(value) for value in payload.get("excluded_dataset_accessions") or []}
+        selected = _selected_accessions(result)
+        checks.append("replacement dataset is the active selection and excluded accessions are not")
+        if not replacement_acc or replacement_acc not in selected or (selected & excluded_accs):
+            passed = False
+        checks.append("replacement dataset carries same-context qualification metadata")
+        if not replacement:
+            passed = False
+    else:
+        if excluded:
+            checks.append("excluded evidence refs are removed from active references")
+            if any(eid in active_refs for eid in excluded):
+                passed = False
+        if "context_mismatch" in categories or "conflicting_evidence" in categories:
+            checks.append("active derived evidence retains context_match_score >= 0.5")
+            low = [
+                eid for eid in active_refs
+                if eid in evidence_items and float(evidence_items[eid].get("context_match_score") or 0) < 0.5
+            ]
+            if low:
+                passed = False
+        if (
+            "causal_overreach" in categories
+            or "gene_mapping_overreach" in categories
+            or "evidence_dependence" in categories
+        ):
+            claim_id = str(payload.get("claim_id") or "")
+            checks.append("referenced claim is downgraded to INFERRED with causal interpretation removed")
+            claim = next(
+                (
+                    row for row in (outputs.get("derived_claims") or [])
+                    if isinstance(row, dict) and str(row.get("claim_id") or "") == claim_id
+                ),
+                None,
+            )
+            if not claim or str(claim.get("claim_class") or "") != "INFERRED" or not claim.get("causal_interpretation_removed"):
+                passed = False
+            checks.append("no active derived claim retains causal language beyond its evidence class")
+            causal_words = (
+                "causes", "causal evidence", "drives disease", "proves", "is causal",
+                "causal target", "致病", "因果靶点", "证明因果",
+            )
+            for row in outputs.get("derived_claims") or []:
+                if not isinstance(row, dict):
+                    continue
+                statement = str(row.get("statement") or "")
+                if not any(word in statement.lower() for word in causal_words):
+                    continue
+                if row.get("causal_interpretation_removed"):
+                    continue
+                if str(row.get("claim_class") or "") in {"FACT", "OBSERVED"} and row.get("effect_direction") not in {None, "unclear"}:
+                    continue
+                passed = False
+                checks.append(f"causal language remains in active claim {row.get('claim_id') or '?'}")
+        if "coverage_gap" in categories or "missing_provenance" in categories:
+            requested = [str(value) for value in payload.get("evidence_ids") or []]
+            checks.append("supplemented evidence ids are active references")
+            if any(eid not in active_refs for eid in requested):
+                passed = False
+            if "missing_provenance" in categories:
+                checks.append("active derived evidence carries tool/source/span provenance")
+                for eid in sorted(active_refs):
+                    row = evidence_items.get(eid)
+                    if row is None or not row.get("tool_run_id") or not row.get("source_uri") or not row.get("source_span"):
+                        passed = False
+                        break
+        if "context_split_needed" in categories:
+            checks.append("evidence is re-bound to the requested same-scope sub-contexts")
+            expected = payload.get("evidence_contexts") or {}
+            splits = outputs.get("context_splits") or []
+            if not any(
+                isinstance(split, dict) and split.get("evidence_contexts") == expected
+                for split in splits
+            ):
+                passed = False
+        if "dataset_ineligibility" in categories:
+            checks.append("ineligible evidence refs are excluded from active references")
+            if excluded and any(eid in active_refs for eid in excluded):
+                passed = False
+
+    if not checks:
+        checks.append("no original finding substance to recheck (transient same-input repair)")
+    recheck = {
+        "finding_id": finding_id,
+        "categories": list(categories),
+        "checks": checks,
+        "passed": passed,
+    }
+    return {finding_id: recheck}, passed
+
+
 def build_repair_resolution(
     *,
     request: RepairRequest,
@@ -1135,7 +1303,7 @@ def build_repair_resolution(
     verification = [
         row for row in active_assessments(assessments, revisions)
         if row.target_id == final_item.item_id
-        and row.actor in {"independent_review", "fake_independent_review"}
+        and row.actor == "independent_review"
         and row.method == "typed_status_gate"
         and row.target_digest == work_item_result_digest(result)
     ]
@@ -1173,22 +1341,31 @@ def build_repair_resolution(
         row.blocking and row.result == AssessmentResult.FAIL
         for row in active_assessments(assessments, revisions)
     )
+    finding_rechecks, finding_rechecks_passed = _finding_recheck_substance(request, result)
     success_gate = (
         result.status == WorkItemStatus.COMPLETED
         and passed_review
         and (same_context or identical_input or overlay_ok)
         and downstream_completed
         and no_active_blocker
+        and finding_rechecks_passed
     )
     if success_gate:
         status = RepairResolutionStatus.RESOLVED
-        rationale = "The repair revision completed and the recomputed subgraph passed independent review."
+        rationale = (
+            "The repair revision completed, the recomputed subgraph passed independent review, "
+            "and the original finding's substantive allegations were rechecked: "
+            + json.dumps({"finding_rechecks": finding_rechecks}, ensure_ascii=False, sort_keys=True)
+        )
     elif exhausted:
         status = RepairResolutionStatus.EXHAUSTED
         rationale = "The bounded project repair budget was exhausted without satisfying the success gate."
     else:
         status = RepairResolutionStatus.UNRESOLVED
-        rationale = "The repair did not satisfy the typed result, overlay, identical-input and independent-review gates."
+        rationale = (
+            "The repair did not satisfy the typed result, overlay, identical-input, "
+            "independent-review or original-finding recheck gates."
+        )
     after = project_snapshot_digest(
         plan=plan,
         results=results,

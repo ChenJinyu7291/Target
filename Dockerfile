@@ -23,12 +23,16 @@ COPY paper_strategy ./paper_strategy
 
 RUN pip install --upgrade pip && \
     pip install ".[${TARGET_EXTRAS}]" && \
-    mkdir -p /opt/target/projects /opt/target/runs /opt/target/cache /opt/target/data/input
+    mkdir -p /opt/target/projects /opt/target/runs /opt/target/cache /opt/target/data/input /data && \
+    useradd --create-home --uid 10001 --shell /usr/sbin/nologin target && \
+    chown -R target:target /opt/target/projects /opt/target/runs /opt/target/cache /opt/target/data/input /data
 
 # Overridable persistent data volume (see docker-compose.yml)
 VOLUME ["/data"]
 
 EXPOSE 8888
+
+USER target
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8888/healthz', timeout=4)" || exit 1

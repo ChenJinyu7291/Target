@@ -25,7 +25,7 @@ import requests
 
 from ..contracts import (
     CONTRACT_VERSION, ClaimClass, CoverageStatus, EvidenceContext, EvidenceItem,
-    SourceLocator, Stance, ToolCapability, ToolDescriptor, ToolResult, ToolStatus, new_id,
+    SourceLocator, Stance, ToolCapability, ToolDescriptor, ToolResult, ToolStatus, new_id, utc_now,
 )
 from ..llm import LLMUnavailable, StepClient
 from .base import ScientificTool, ToolContext, ToolExecution
@@ -79,6 +79,35 @@ def parse_fulltext_sections(xml_text: str) -> list[dict[str, str]]:
         if len(body) >= 400:  # 短小节不提供可靠跨句证据
             sections.append({"section": (title or "untitled")[:80], "text": body})
     return sections
+
+
+DIRECTION_TERMS = (
+    "increase", "decrease", "upregulat", "downregulat", "overexpress", "knockout",
+    "knockdown", "silencing", "activate", "inhibit", "loss-of-function",
+    "gain-of-function", "promotes", "suppresses", "mediates", "elevat", "reduc",
+)
+DESIGN_TERMS = (
+    "randomized", "clinical trial", "cohort", "gwas", "eqtl", "colocalization",
+    "perturbation", "crispr", "rnai", "sirna", "shrna", "assay", "experiment",
+    "functional", "mechanistic", "study", "model",
+)
+
+
+def _design_direction_supported(claim: dict[str, Any]) -> bool:
+    """FACT requires an explicit direction plus a study-design/mechanistic anchor."""
+    text = f"{claim.get('statement', '')} {claim.get('exact_quote', '')}".casefold()
+    direction = any(token in text for token in DIRECTION_TERMS)
+    design = any(token in text for token in DESIGN_TERMS)
+    return direction and design
+
+
+def _claim_class_for(claim: dict[str, Any]) -> ClaimClass:
+    statement = str(claim.get("statement") or "")
+    if "co-mentions" in statement:
+        return ClaimClass.UNVERIFIED
+    if _design_direction_supported(claim):
+        return ClaimClass.FACT
+    return ClaimClass.INFERRED
 
 
 class EuropePMCRAGTool(ScientificTool):
@@ -145,6 +174,11 @@ class EuropePMCRAGTool(ScientificTool):
             conn.execute(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5("
                 "chunk_id UNINDEXED, source_id UNINDEXED, section UNINDEXED, text)")
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS corpus_sources("
+                "source_id TEXT PRIMARY KEY, uri TEXT, version TEXT, ingested_at TEXT)")
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS corpus_meta(key TEXT PRIMARY KEY, value TEXT)")
 
     def _build_run_index(self, db_path: Path, chunks: list[dict[str, Any]]) -> None:
         self._create_schema(db_path)
@@ -154,13 +188,40 @@ class EuropePMCRAGTool(ScientificTool):
                 "INSERT INTO chunks(chunk_id, source_id, section, text) "
                 "VALUES (:chunk_id, :source_id, :section, :text)", chunks)
 
-    def _update_shared_corpus(self, db_path: Path, chunks: list[dict[str, Any]]) -> int:
+    def _update_shared_corpus(
+        self, db_path: Path, chunks: list[dict[str, Any]],
+        source_meta: dict[str, dict[str, str]] | None = None,
+    ) -> int:
         self._create_schema(db_path)
+        source_meta = source_meta or {}
         with sqlite3.connect(db_path) as conn:
             conn.executemany(
                 "INSERT OR REPLACE INTO chunks(rowid, chunk_id, source_id, section, text) "
                 "VALUES ((SELECT rowid FROM chunks WHERE chunk_id = :chunk_id), "
                 ":chunk_id, :source_id, :section, :text)", chunks)
+            for source_id, meta in source_meta.items():
+                conn.execute(
+                    "INSERT INTO corpus_sources(source_id, uri, version, ingested_at) "
+                    "VALUES (:source_id, :uri, :version, :ingested_at) "
+                    "ON CONFLICT(source_id) DO UPDATE SET "
+                    "uri=excluded.uri, version=excluded.version",
+                    {"source_id": source_id, "uri": meta.get("uri") or "",
+                     "version": meta.get("version") or "", "ingested_at": utc_now()},
+                )
+            rows = conn.execute(
+                "SELECT chunk_id, source_id, section, text FROM chunks ORDER BY chunk_id"
+            ).fetchall()
+            snapshot_digest = hashlib.sha256(
+                json.dumps(rows, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+            conn.execute(
+                "INSERT OR REPLACE INTO corpus_meta(key, value) VALUES ('snapshot_sha256', ?)",
+                (snapshot_digest,),
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO corpus_meta(key, value) VALUES ('updated_at', ?)",
+                (utc_now(),),
+            )
             return conn.execute("SELECT count(*) FROM chunks").fetchone()[0]
 
     @staticmethod
@@ -183,7 +244,30 @@ class EuropePMCRAGTool(ScientificTool):
                     "ORDER BY bm25(chunks) LIMIT ?",
                     (query, limit),
                 ).fetchall()
-        return [{"chunk_id": r[0], "source_id": r[1], "section": r[2], "text": r[3]} for r in rows]
+            source_rows: dict[str, tuple[str, str, str, str]] = {}
+            source_ids = {row[1] for row in rows}
+            if source_ids:
+                marks = ",".join("?" * len(source_ids))
+                source_rows = {
+                    row[0]: row for row in conn.execute(
+                        f"SELECT source_id, uri, version, ingested_at FROM corpus_sources "
+                        f"WHERE source_id IN ({marks})",
+                        tuple(sorted(source_ids)),
+                    ).fetchall()
+                }
+            snapshot = conn.execute(
+                "SELECT value FROM corpus_meta WHERE key = 'snapshot_sha256'"
+            ).fetchone()
+        snapshot_digest = snapshot[0] if snapshot else ""
+        recalled = []
+        for r in rows:
+            provenance = source_rows.get(r[1], ("", "", "", ""))
+            recalled.append({
+                "chunk_id": r[0], "source_id": r[1], "section": r[2], "text": r[3],
+                "uri": provenance[1] or "", "version": provenance[2] or "",
+                "ingested_at": provenance[3] or "", "corpus_snapshot_sha256": snapshot_digest,
+            })
+        return recalled
 
     # ---------------- LLM 重排(可降级) ----------------
     def _llm_stage_key(self, stage: str, disease: str, genes: list[str],
@@ -320,7 +404,11 @@ class EuropePMCRAGTool(ScientificTool):
         started = time.perf_counter()
         run_id = new_id("tool")
         resolver = next((item for item in reversed(context.prior_results) if item.tool_name == "disease_resolver"), None)
-        disease = (resolver.outputs.get("normalized_disease") if resolver else None) or context.task.context.disease or ""
+        resolver_unresolved = resolver is not None and resolver.outputs.get("identifier_source") == "unresolved"
+        disease = (
+            (resolver.outputs.get("normalized_disease") if resolver and not resolver_unresolved else None)
+            or context.task.context.disease or ""
+        )
         disease_terms = (resolver.outputs.get("search_synonyms") if resolver else None) or [disease]
         genes = context.candidate_genes[:20]
         disease_query = " OR ".join(f'"{term}"' for term in disease_terms[:4])
@@ -379,7 +467,7 @@ class EuropePMCRAGTool(ScientificTool):
         run_index = context.run_dir / "literature_fts.sqlite"
         self._build_run_index(run_index, chunks)
         shared_index = context.cache_dir / "literature_corpus.sqlite"
-        shared_size = self._update_shared_corpus(shared_index, chunks)
+        shared_size = self._update_shared_corpus(shared_index, chunks, source_meta)
         current_sources = {c["source_id"] for c in chunks}
         recalled = self._recall(shared_index, genes, prefer_sources=current_sources)
         recalled, rerank_backend, rerank_cached = self._llm_rerank(disease, genes, recalled, context.cache_dir)
@@ -389,28 +477,65 @@ class EuropePMCRAGTool(ScientificTool):
             extracted = self._deterministic_extract(disease, disease_terms, genes, recalled)
         by_chunk = {c["chunk_id"]: c for c in recalled}
         evidence = []
-        for claim in extracted:
+        for claim in ([] if resolver_unresolved else extracted):
             chunk = by_chunk[claim["chunk_id"]]
             meta = source_meta.get(chunk["source_id"])
-            if meta is None:  # 共享语料中的历史来源: 用注册 URI 兜底, 仍要求 chunk 内 span 命中
-                meta = {"uri": f"https://europepmc.org/article/MED/{chunk['source_id']}",
-                        "title": "", "version": "shared-corpus"}
+            if meta is None and (chunk.get("corpus_snapshot_sha256") or chunk.get("ingested_at") or chunk.get("uri")):
+                # 共享语料中的历史来源: 只使用 corpus 快照内记录的权威 URI/版本/校验和。
+                meta = {
+                    "uri": chunk.get("uri") or f"shared-corpus://{chunk['source_id']}",
+                    "title": "",
+                    "version": (
+                        f"shared-corpus:{chunk['corpus_snapshot_sha256'][:12]}"
+                        if chunk.get("corpus_snapshot_sha256") else "shared-corpus"
+                    ),
+                    "sha256": chunk.get("corpus_snapshot_sha256") or None,
+                    "ingested_at": chunk.get("ingested_at") or None,
+                    "provenance_missing": not chunk.get("uri"),
+                }
+            if meta is None:  # 共享语料历史来源且无任何可恢复溯源: 不得猜测 Europe PMC URI。
+                meta = {"uri": f"shared-corpus://{chunk['source_id']}", "title": "",
+                        "version": "shared-corpus", "provenance_missing": True}
             quote = claim["exact_quote"]
             start = chunk["text"].index(quote)
             section = chunk.get("section", "abstract")
             flags = ["abstract_only"] if section == "abstract" else [section[:60]]
+            if meta.get("provenance_missing"):
+                flags.append("provenance_missing")
+            source_kwargs = dict(
+                uri=meta["uri"], source_id=chunk["source_id"], version=meta.get("version"),
+                section=section, chunk_id=chunk["chunk_id"], start_char=start, end_char=start + len(quote),
+            )
+            if meta.get("sha256"):
+                source_kwargs["sha256"] = meta["sha256"]
+            version_meta: dict[str, Any] = {}
+            if meta.get("ingested_at"):
+                version_meta["ingested_at"] = meta["ingested_at"]
+            if meta.get("sha256"):
+                version_meta["corpus_snapshot_sha256"] = meta["sha256"]
+            if version_meta:
+                source_kwargs["version_meta"] = version_meta
+            claim_direction = str(claim.get("effect_direction") or "")
             evidence.append(EvidenceItem(
-                tool_run_id=run_id, gene_symbol=claim["gene"], claim_class=ClaimClass.FACT,
+                tool_run_id=run_id, gene_symbol=claim["gene"], claim_class=_claim_class_for(claim),
                 statement=claim["statement"],
-                source=SourceLocator(
-                    uri=meta["uri"], source_id=chunk["source_id"], version=meta["version"],
-                    section=section, chunk_id=chunk["chunk_id"], start_char=start, end_char=start + len(quote),
-                ),
+                source=SourceLocator(**source_kwargs),
                 source_span=quote,
                 context=EvidenceContext(disease=disease, assay="literature extraction"),
-                stance=claim.get("stance", "uncertain"), effect_direction="unclear", effect={},
+                stance=claim.get("stance", "uncertain"),
+                effect_direction=claim_direction if claim_direction in {"increase", "decrease", "mixed"} else "unclear",
+                effect={},
                 uncertainty="This is a source-grounded literature statement; study design and causal strength require review.",
                 quality_flags=flags, context_match_score=0.75 if section == "abstract" else 0.85,
+                context_match={
+                    "matched_disease": [disease] if disease else [],
+                    "matched_tissue": [],
+                    "matched_cell": [],
+                    "matched_assay": ["literature extraction"],
+                    "source_fields": [section],
+                    "context_score_origin": "tool_estimate",
+                    "tool_estimate": 0.75 if section == "abstract" else 0.85,
+                },
             ))
         coverage = CoverageStatus.COVERED if evidence else CoverageStatus.PARTIAL
         result = ToolResult(
@@ -425,14 +550,24 @@ class EuropePMCRAGTool(ScientificTool):
                      "extracted_claims": len(evidence), "extraction_backend": backend,
                      "rerank_cached": rerank_cached, "extract_cached": extract_cached,
                      "llm_stage_cached": rerank_cached or extract_cached,
-                     "search_hits_are_evidence": False},
+                     "search_hits_are_evidence": False,
+                     "context_match": {
+                         "matched_disease": [disease] if disease else [],
+                         "matched_tissue": [],
+                         "matched_cell": [],
+                         "matched_assay": ["literature extraction"],
+                         "source_fields": ["literature extraction"],
+                     },
+                     "context_score_origin": "tool_estimate"},
             capability=capability, data_version="EuropePMC:live-or-cache", code_version="2.2.0",
             parameters={"chunk_size": 1200, "chunk_overlap": 150,
                         "recall": "SQLite FTS5 BM25 over persistent shared corpus",
                         "rerank": "Step LLM rerank with persistent stage cache and BM25 fallback",
                         "fulltext": f"open-access fullTextXML, <= {self.max_fulltext} articles"},
             artifacts=[], evidence_ids=[item.evidence_id for item in evidence],
-            warnings=[] if evidence else ["no_span_validated_claims"],
+            warnings=([] if evidence else ["no_span_validated_claims"])
+                     + (["disease_identifier_unresolved: literature evidence refused until the disease identifier is resolved"]
+                        if resolver_unresolved else []),
             limitations=["A retrieval hit is not evidence unless a literal span was extracted and validated.",
                          "Full-text enrichment covers at most the first open-access hits per run."],
             cached=cached, elapsed_ms=int((time.perf_counter() - started) * 1000),

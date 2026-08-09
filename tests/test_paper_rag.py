@@ -261,3 +261,37 @@ def test_domain_planner_injects_paper_evidence(tmp_path):
     plain = Planner(client, registry, pattern_store=None)
     plain.create_plan(task)
     assert plain.last_paper_evidence == []
+
+def test_rag_cache_hits_and_invalidates_on_external_change(tmp_path):
+    store = PaperRagStore(tmp_path / "chunks.jsonl")
+    assert store.add(_chunk()) is True
+    # Force a cold cache so the counting wrapper observes the first load.
+    store._rows = None
+    store._row_stat = None
+    calls: list[int] = []
+    original_load = store._load
+
+    def counting_load():
+        calls.append(1)
+        return original_load()
+
+    store._load = counting_load  # type: ignore[method-assign]
+
+    # Repeated reads hit the process-local cache instead of re-reading JSONL.
+    assert store.search(disease="colitis")
+    assert store.get("chunk-12345678-abstract-000") is not None
+    assert store.corpus_card()["chunks"] == 1
+    assert len(calls) == 1
+
+    # An external writer changes size/mtime, so the next read reloads once.
+    extra = _chunk({
+        "chunk_id": "chunk-12345678-abstract-001",
+        "text": "A chemistry methods note without disease signal.",
+        "lane_tags": [],
+        "disease_tags": [],
+    })
+    with store.path.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(extra.model_dump_json() + "\n")
+    assert store.get("chunk-12345678-abstract-001") is not None
+    assert store.corpus_card()["chunks"] == 2
+    assert len(calls) == 2

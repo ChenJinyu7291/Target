@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import platform
 import statistics
 import sys
@@ -171,10 +172,11 @@ def collect_metrics() -> dict:
 
 
 def setup_plot_font() -> None:
-    candidates = [
-        Path("C:/Windows/Fonts/msyh.ttc"),
-        Path("C:/Windows/Fonts/simhei.ttf"),
-    ]
+    windows_dir = os.environ.get("WINDIR")
+    candidates = []
+    if windows_dir:
+        fonts_dir = Path(windows_dir) / "Fonts"
+        candidates = [fonts_dir / "msyh.ttc", fonts_dir / "simhei.ttf"]
     for candidate in candidates:
         if candidate.exists():
             font_manager.fontManager.addfont(str(candidate))

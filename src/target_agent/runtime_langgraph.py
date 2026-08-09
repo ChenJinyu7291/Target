@@ -508,9 +508,11 @@ class LangGraphRuntime:
             ranked = rank_targets(
                 candidate_genes, state["evidence"], state["results"], state["findings"],
                 minimum_coloc_pp4=task.constraints.genetics.minimum_coloc_pp4,
+                task_context=task.context,
+                terminal_status=status,
             )
             ranked_payload = self._serialize_ranked(ranked, task.constraints.max_ranked_targets)
-            cards = build_cards(task, ranked)
+            cards = build_cards(task, ranked, terminal_status=status)
             store.save_json("ranked_targets.json", ranked_payload)
             store.save_cards(cards)
             graph = build_mechanistic_graph(task, state["evidence"], [row["gene"] for row in ranked_payload])
@@ -584,6 +586,8 @@ class LangGraphRuntime:
                 "supporting_ids": item.supporting_ids, "opposing_ids": item.opposing_ids,
                 "safety_blockers": item.safety_blockers, "evidence_gaps": item.evidence_gaps,
                 "matched_drugs": item.matched_drugs,
+                "context_score_origin": item.context_score_origin,
+                "context_score_notes": item.context_score_notes,
                 "genetic_evidence_summary": [
                     row.model_dump(mode="json") for row in item.genetic_evidence_summary
                 ],

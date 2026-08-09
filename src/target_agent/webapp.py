@@ -1,6 +1,7 @@
 """Flask API and static single-page research workbench."""
 from __future__ import annotations
 
+import hmac
 import json
 import threading
 import time
@@ -12,8 +13,8 @@ from pydantic import ValidationError
 
 from .contracts import CONTRACT_VERSION, TaskSpec, new_id
 from .kernel import (
-    KernelConfigError, KernelDisabledError, KernelManager, KernelNotConfiguredError,
-    KernelNotFoundError, KernelTimeoutError, KernelUnavailableError,
+    KernelConfigError, KernelDisabledError, KernelForbiddenError, KernelManager,
+    KernelNotConfiguredError, KernelNotFoundError, KernelTimeoutError, KernelUnavailableError,
 )
 from .legacy import parse_task_spec
 from .research_contracts import (
@@ -77,7 +78,24 @@ def create_app(
 
     @app.errorhandler(ValueError)
     def invalid_path(exc):
-        return jsonify({"error": "invalid request path", "detail": str(exc)}), 400
+        app.logger.warning("request rejected with ValueError: %s", exc)
+        return jsonify({"error": "invalid_request", "detail": "request could not be processed"}), 400
+
+    @app.before_request
+    def require_web_token():
+        """Optional bearer-token gate for /api/*; /healthz stays public."""
+        token = runtime.settings.web_token
+        configured = token.get_secret_value() if token else ""
+        if not configured or not request.path.startswith("/api/"):
+            return None
+        header = request.headers.get("Authorization", "")
+        scheme, _, presented = header.partition(" ")
+        presented = presented.strip() if scheme.lower() == "bearer" else ""
+        if not presented or not hmac.compare_digest(
+            presented.encode("utf-8"), configured.encode("utf-8")
+        ):
+            return jsonify({"error": "unauthorized", "detail": "authentication required"}), 401
+        return None
 
     @app.get("/")
     def index():
@@ -106,6 +124,9 @@ def create_app(
         return jsonify({
             "contract_version": CONTRACT_VERSION,
             "research_contract_version": RESEARCH_CONTRACT_VERSION,
+            "auth": {"token_required": bool(
+                runtime.settings.web_token and runtime.settings.web_token.get_secret_value()
+            )},
             "settings": runtime.settings.public_summary(),
             "tools": runtime.registry.public_capabilities(),
             "research_modules": research_runtime.registry.public_capabilities(),
@@ -161,6 +182,8 @@ def create_app(
             info = kernel_manager.create(language=language, cwd=cwd)
         except (KernelDisabledError, KernelNotConfiguredError, KernelConfigError) as exc:
             return jsonify({"error": exc.__class__.__name__, "detail": str(exc)}), 400
+        except KernelForbiddenError as exc:
+            return jsonify({"error": exc.__class__.__name__, "detail": str(exc)}), 403
         return jsonify(info.to_dict()), 201
 
     @app.get("/api/kernels/<kernel_id>")
@@ -278,24 +301,32 @@ def create_app(
             return jsonify({"error": "run not found"}), 404
 
         def stream():
-            delivered = 0
+            # Read only the bytes appended since the last tick (byte cursor);
+            # idle is capped so abandoned streams do not hold a worker forever.
+            offset = 0
             idle = 0
-            while idle < 600:
+            while idle < 30:
                 trace_path = run_dir / "trace.jsonl"
-                lines = trace_path.read_text(encoding="utf-8").splitlines() if trace_path.exists() else []
-                for line in lines[delivered:]:
+                new_lines: list[str] = []
+                if trace_path.exists():
+                    with trace_path.open(encoding="utf-8") as fh:
+                        end = fh.seek(0, 2)
+                        if offset > end:
+                            offset = 0  # trace was truncated/rotated; restart
+                        fh.seek(offset)
+                        new_lines = [line.rstrip("\r\n") for line in fh]
+                        offset = fh.tell()
+                for line in new_lines:
                     yield f"data: {line}\n\n"
-                if len(lines) > delivered:
-                    delivered = len(lines)
-                    idle = 0
-                else:
-                    idle += 1
+                idle = 0 if new_lines else idle + 1
                 status_path = run_dir / "status.json"
                 if status_path.exists():
                     status = json.loads(status_path.read_text(encoding="utf-8"))
                     if status.get("terminal_status"):
                         yield f"event: terminal\ndata: {json.dumps(status, ensure_ascii=False)}\n\n"
                         break
+                # Heartbeat keeps proxies from closing idle connections while
+                # the stream is waiting for new trace lines.
                 yield ": heartbeat\n\n"
                 time.sleep(1)
 

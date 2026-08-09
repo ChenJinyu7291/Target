@@ -7,7 +7,9 @@ second source of scientific state.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import Field
 
 from .research_runtime import ResearchProjectRuntime
 from .research_service import ResearchProjectService
@@ -43,7 +45,7 @@ def create_mcp_server(
         question: str,
         disease: str,
         title: str | None = None,
-        project_id: str | None = None,
+        project_id: Annotated[str, Field(min_length=1)] | None = None,
         disease_subtype: str | None = None,
         tissue: str | None = None,
         cell_type: str | None = None,
@@ -73,12 +75,12 @@ def create_mcp_server(
         return product.reserve(project)
 
     @server.tool()
-    def target_run_project(project_id: str) -> dict[str, Any]:
+    def target_run_project(project_id: Annotated[str, Field(min_length=1)]) -> dict[str, Any]:
         """Advance a durable project until a checkpoint or terminal state."""
         return product.run(project_id)
 
     @server.tool()
-    def target_get_project(project_id: str) -> dict[str, Any]:
+    def target_get_project(project_id: Annotated[str, Field(min_length=1)]) -> dict[str, Any]:
         """Read the safe durable projection of a Target research project."""
         return product.snapshot(project_id)
 
@@ -88,7 +90,7 @@ def create_mcp_server(
         return {"projects": product.list_projects()}
 
     @server.tool()
-    def target_get_events(project_id: str, after_sequence: int = 0) -> dict[str, Any]:
+    def target_get_events(project_id: Annotated[str, Field(min_length=1)], after_sequence: Annotated[int, Field(ge=0)] = 0) -> dict[str, Any]:
         """Replay ordered project events after a previously observed cursor."""
         events = product.events(project_id, after_sequence=after_sequence)
         return {
@@ -99,9 +101,9 @@ def create_mcp_server(
 
     @server.tool()
     def target_get_domain_activities(
-        project_id: str,
-        after_sequence: int = 0,
-        limit: int = 200,
+        project_id: Annotated[str, Field(min_length=1)],
+        after_sequence: Annotated[int, Field(ge=0)] = 0,
+        limit: Annotated[int, Field(ge=1, le=500)] = 200,
         work_item_id: str | None = None,
     ) -> dict[str, Any]:
         """Read source-linked domain stages without copying scientific results."""
@@ -113,13 +115,13 @@ def create_mcp_server(
         )
 
     @server.tool()
-    def target_get_repairs(project_id: str) -> dict[str, Any]:
+    def target_get_repairs(project_id: Annotated[str, Field(min_length=1)]) -> dict[str, Any]:
         """Read immutable repair requests, execution overlays and verified outcomes."""
         return product.repairs(project_id)
 
     @server.tool()
     def target_decide_repair(
-        project_id: str,
+        project_id: Annotated[str, Field(min_length=1)],
         repair_request_id: str,
         trigger_snapshot_digest: str,
         approve: bool,
@@ -140,7 +142,7 @@ def create_mcp_server(
 
     @server.tool()
     def target_propose_fork(
-        project_id: str,
+        project_id: Annotated[str, Field(min_length=1)],
         target_work_item_id: str,
         mode: str,
         rationale: str,
@@ -161,7 +163,7 @@ def create_mcp_server(
 
     @server.tool()
     def target_decide_fork(
-        project_id: str,
+        project_id: Annotated[str, Field(min_length=1)],
         branch_id: str,
         approve: bool,
         actor: str,
@@ -179,13 +181,13 @@ def create_mcp_server(
         )
 
     @server.tool()
-    def target_get_branches(project_id: str) -> dict[str, Any]:
+    def target_get_branches(project_id: Annotated[str, Field(min_length=1)]) -> dict[str, Any]:
         """Read the fork branch history and immutable directives for a project."""
         return product.branches(project_id)
 
     @server.tool()
     def target_accept_checkpoint(
-        project_id: str,
+        project_id: Annotated[str, Field(min_length=1)],
         target_id: str,
         actor: str,
         rationale: str,
@@ -202,9 +204,9 @@ def create_mcp_server(
 
     @server.tool()
     def target_read_text_artifact(
-        project_id: str,
+        project_id: Annotated[str, Field(min_length=1)],
         artifact_id: str,
-        max_characters: int = 100_000,
+        max_characters: Annotated[int, Field(ge=1, le=1_000_000)] = 100_000,
     ) -> dict[str, Any]:
         """Read a checksum-verified text artifact under an explicit size bound."""
         return product.read_text_artifact(
@@ -215,7 +217,7 @@ def create_mcp_server(
 
 
     @server.tool()
-    def target_create_session(project_id: str, title: str | None = None, role: str = "researcher") -> dict[str, Any]:
+    def target_create_session(project_id: Annotated[str, Field(min_length=1)], title: str | None = None, role: str = "researcher") -> dict[str, Any]:
         """Create a conversation view over one durable project.
 
         role is researcher|reviewer|admin|viewer; viewer sessions are read-only
@@ -224,18 +226,18 @@ def create_mcp_server(
         return sessions.create(project_id, title=title, role=role)
 
     @server.tool()
-    def target_list_sessions(project_id: str) -> dict[str, Any]:
+    def target_list_sessions(project_id: Annotated[str, Field(min_length=1)]) -> dict[str, Any]:
         """List sessions and their append-only message counts for one project."""
         return sessions.list(project_id)
 
     @server.tool()
-    def target_read_session(project_id: str, session_id: str) -> dict[str, Any]:
+    def target_read_session(project_id: Annotated[str, Field(min_length=1)], session_id: str) -> dict[str, Any]:
         """Read all messages of one session; tampered messages raise an error."""
         return sessions.messages(project_id, session_id)
 
     @server.tool()
     def target_post_session_message(
-        project_id: str,
+        project_id: Annotated[str, Field(min_length=1)],
         session_id: str,
         text: str,
         ask_agent: bool = False,
@@ -251,7 +253,7 @@ def create_mcp_server(
 
     @server.tool()
     def target_session_intervene(
-        project_id: str,
+        project_id: Annotated[str, Field(min_length=1)],
         session_id: str,
         action: str,
         rationale: str,
@@ -283,12 +285,12 @@ def create_mcp_server(
             input_overrides=input_overrides,
         )
     @server.resource("target://projects/{project_id}")
-    def target_project_resource(project_id: str) -> str:
+    def target_project_resource(project_id: Annotated[str, Field(min_length=1)]) -> str:
         """Return one durable project as a JSON resource."""
         return json.dumps(product.snapshot(project_id), ensure_ascii=False, indent=2)
 
     @server.resource("target://projects/{project_id}/artifacts/{artifact_id}")
-    def target_artifact_resource(project_id: str, artifact_id: str) -> str:
+    def target_artifact_resource(project_id: Annotated[str, Field(min_length=1)], artifact_id: str) -> str:
         """Return one verified text artifact as a JSON resource."""
         return json.dumps(
             product.read_text_artifact(project_id, artifact_id),

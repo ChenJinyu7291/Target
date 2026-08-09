@@ -184,7 +184,7 @@ class FakeFindingReviewModule:
                 target_digest=work_item_result_digest(result),
                 dimension=AssessmentDimension.METHODOLOGY, level=AssessmentLevel.A0,
                 result=AssessmentResult.FAIL if problematic else AssessmentResult.PASS,
-                actor="fake_independent_review", method="typed_status_gate",
+                actor="independent_review", method="typed_status_gate",
                 rationale=f"Status is {result.status.value}.", blocking=problematic,
             ))
             if problematic:
@@ -198,7 +198,7 @@ class FakeFindingReviewModule:
                     project_id=context.project.project_id, target_id=item_id,
                     target_digest=work_item_result_digest(result),
                     dimension=AssessmentDimension.ENTAILMENT, level=AssessmentLevel.A0,
-                    result=AssessmentResult.FAIL, actor="fake_independent_review",
+                    result=AssessmentResult.FAIL, actor="independent_review",
                     method="typed_domain_review",
                     rationale=str(finding.get("message") or finding.get("category") or "domain finding"),
                     blocking=True,
@@ -301,13 +301,13 @@ def _propose_one(tmp_path, registry, project, plan, finding,
         AssessmentRecord(
             project_id=project.project_id, target_id="target_discovery", target_digest=digest,
             dimension=AssessmentDimension.ENTAILMENT, level=AssessmentLevel.A0,
-            result=AssessmentResult.FAIL, actor="fake_independent_review",
+            result=AssessmentResult.FAIL, actor="independent_review",
             method="typed_domain_review", rationale="blocking domain finding", blocking=True,
         ),
         AssessmentRecord(
             project_id=project.project_id, target_id="target_discovery", target_digest=digest,
             dimension=AssessmentDimension.METHODOLOGY, level=AssessmentLevel.A0,
-            result=AssessmentResult.PASS, actor="fake_independent_review",
+            result=AssessmentResult.PASS, actor="independent_review",
             method="typed_status_gate", rationale="status ok", blocking=False,
         ),
     ]
@@ -680,7 +680,7 @@ def test_policy_never_proposes_scope_or_truth_changes(tmp_path):
         AssessmentRecord(
             project_id=project.project_id, target_id="target_discovery", target_digest=digest,
             dimension=AssessmentDimension.ENTAILMENT, level=AssessmentLevel.A0,
-            result=AssessmentResult.FAIL, actor="fake_independent_review",
+            result=AssessmentResult.FAIL, actor="independent_review",
             method="typed_domain_review", rationale="blocking", blocking=True,
         )
     ]
@@ -717,7 +717,7 @@ def test_overlay_revision_uses_domain_overlay_module_and_resolution_gate(tmp_pat
         AssessmentRecord(
             project_id=project.project_id, target_id="target_discovery", target_digest=digest,
             dimension=AssessmentDimension.ENTAILMENT, level=AssessmentLevel.A0,
-            result=AssessmentResult.FAIL, actor="fake_independent_review",
+            result=AssessmentResult.FAIL, actor="independent_review",
             method="typed_domain_review", rationale="blocking", blocking=True,
         )
     ]
@@ -759,7 +759,7 @@ def test_overlay_revision_uses_domain_overlay_module_and_resolution_gate(tmp_pat
             project_id=project.project_id, target_id=overlay_id,
             target_digest=work_item_result_digest(overlay_result),
             dimension=AssessmentDimension.METHODOLOGY, level=AssessmentLevel.A0,
-            result=AssessmentResult.PASS, actor="fake_independent_review",
+            result=AssessmentResult.PASS, actor="independent_review",
             method="typed_status_gate", rationale="overlay passed", blocking=False,
         )
     ]
@@ -903,7 +903,7 @@ def test_integrity_rejects_resolved_repair_with_active_blocking_assessment(tmp_p
         dimension=AssessmentDimension.METHODOLOGY,
         level=AssessmentLevel.A0,
         result=AssessmentResult.FAIL,
-        actor="fake_independent_review",
+        actor="independent_review",
         method="typed_status_gate",
         rationale="post-resolution blocker injected by integrity test",
         blocking=True,

@@ -13,6 +13,7 @@ from .contracts import (
     ClaimClass, CoverageStatus, EvidenceItem, ReviewerFinding, TaskSpec,
     ToolResult, ToolStatus,
 )
+from .context_score import evidence_context_score, recompute_context_score
 from .llm import LLMUnavailable, StepClient
 
 
@@ -51,10 +52,15 @@ class Reviewer:
                     message=f"Evidence {item.evidence_id} lacks a valid tool/source/span chain.",
                     related_ids=[item.evidence_id, item.tool_run_id], required_action="Repair or remove the evidence before reporting.",
                 ))
-            if item.context_match_score < 0.5:
+            recomputed_context = evidence_context_score(item, task.context)
+            if recomputed_context.score < 0.5:
                 findings.append(ReviewerFinding(
                     severity="major", category="context_mismatch",
-                    message=f"Evidence {item.evidence_id} has context match {item.context_match_score:.2f} and cannot enter formal ranking.",
+                    message=(
+                        f"Evidence {item.evidence_id} has recomputed context match "
+                        f"{recomputed_context.score:.2f} (self-reported estimate "
+                        f"{item.context_match_score:.2f}) and cannot enter formal ranking."
+                    ),
                     related_ids=[item.evidence_id], required_action="Exclude from formal score and retain only as exploratory context.",
                 ))
             causal_words = (
@@ -126,12 +132,33 @@ class Reviewer:
                     message=f"Tool {result.tool_name} has partial coverage.", related_ids=[result.tool_run_id],
                     required_action="Expose uncovered genes/context as an evidence gap.",
                 ))
-            if result.context_match_score < 0.5:
+            tool_context_meta = result.outputs.get("context_match")
+            if isinstance(tool_context_meta, dict) and tool_context_meta:
+                recomputed_tool_context = recompute_context_score(task.context, None, tool_context_meta)
+                effective_tool_context = recomputed_tool_context.score
+            else:
+                # No match evidence was submitted: keep the legacy coverage gate
+                # but never let a missing-metadata result claim a higher score.
+                effective_tool_context = result.context_match_score
+            if effective_tool_context < 0.5:
                 severity = "minor" if result.outputs.get("formal_score_eligible") is False else "major"
                 findings.append(ReviewerFinding(
                     severity=severity, category="context_mismatch",
-                    message=f"Tool {result.tool_name} context match is {result.context_match_score:.2f}.",
+                    message=(
+                        f"Tool {result.tool_name} context match is {effective_tool_context:.2f} "
+                        f"(self-reported estimate {result.context_match_score:.2f})."
+                    ),
                     related_ids=[result.tool_run_id], required_action="Exclude low-match outputs from formal ranking.",
+                ))
+            if result.tool_name == "disease_resolver" and result.outputs.get("identifier_source") == "unresolved":
+                findings.append(ReviewerFinding(
+                    severity="blocking", category="tool_failure",
+                    message=(
+                        "Disease identifier resolution failed; the normalized disease label "
+                        "is an unverified fallback and must not be treated as resolved context."
+                    ),
+                    related_ids=[result.tool_run_id],
+                    required_action="Resolve the disease identifier or request a canonical disease ID before downstream evidence is trusted.",
                 ))
             for numeric_error in result.outputs.get("numeric_validation_errors", []):
                 findings.append(ReviewerFinding(

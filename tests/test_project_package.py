@@ -151,3 +151,22 @@ def test_inspect_package_rejects_tampered_archive(tmp_path):
 
     with pytest.raises(ValueError, match="checksum mismatch"):
         inspect_package(tampered)
+
+def test_import_rejects_member_not_listed_in_manifest(tmp_path):
+    runtime, project = _run_fake_project(tmp_path, "project-unlisted")
+    package = tmp_path / "package.zip"
+    export_project(runtime.projects_dir, project.project_id, output=package)
+
+    entries: dict[str, bytes] = {}
+    with zipfile.ZipFile(package) as zf:
+        for name in zf.namelist():
+            entries[name] = zf.read(name)
+    entries["extra/unlisted.txt"] = b"not covered by the manifest\n"
+    tampered = tmp_path / "unlisted.zip"
+    with zipfile.ZipFile(tampered, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for name, content in entries.items():
+            zf.writestr(name, content)
+
+    with pytest.raises(ValueError, match="not listed in manifest"):
+        import_project(tmp_path / "projects-unlisted", tampered)
+    assert not (tmp_path / "projects-unlisted" / project.project_id).exists()

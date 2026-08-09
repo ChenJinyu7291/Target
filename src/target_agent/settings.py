@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     enable_census_expression: bool = Field(default=False, alias="TARGET_AGENT_ENABLE_CENSUS_EXPRESSION")
     web_workers: int = Field(default=2, alias="TARGET_AGENT_WEB_WORKERS", ge=1, le=16)
     web_queue_size: int = Field(default=8, alias="TARGET_AGENT_WEB_QUEUE_SIZE", ge=1, le=100)
+    web_token: SecretStr | None = Field(default=None, alias="TARGET_AGENT_WEB_TOKEN", repr=False)
     gsea_permutations: int = Field(default=1000, alias="TARGET_AGENT_GSEA_PERMUTATIONS", ge=100, le=10000)
     random_seed: int = Field(default=123, alias="TARGET_AGENT_RANDOM_SEED")
     reviewer_lora_base: Path | None = Field(default=None, alias="TARGET_AGENT_REVIEWER_LORA_BASE")
@@ -109,6 +110,7 @@ class Settings(BaseSettings):
     kernel_python_bin: str = Field(default="", alias="TARGET_AGENT_KERNEL_PYTHON")
     kernel_r_bin: str = Field(default="", alias="TARGET_AGENT_KERNEL_R")
     kernel_port: int = Field(default=8765, alias="TARGET_AGENT_KERNEL_PORT", ge=1024, le=65535)
+    kernel_token: SecretStr | None = Field(default=None, alias="TARGET_AGENT_KERNEL_TOKEN", repr=False)
 
     @property
     def step_configured(self) -> bool:
