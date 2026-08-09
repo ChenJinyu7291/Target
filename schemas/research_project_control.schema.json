@@ -1,0 +1,54 @@
+{
+  "$defs": {
+    "ControlRequestKind": {
+      "description": "Durable user-issued control intent consumed at a safe execution boundary.",
+      "enum": [
+        "none",
+        "pause",
+        "cancel",
+        "resume"
+      ],
+      "title": "ControlRequestKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Current control intent for one durable project.\n\nThe request itself is also recorded as an append-only project event; this\nfile is only the latest intent that the runtime consumes at the next safe\nwork-item boundary (or immediately when no execution holds the lock).",
+  "properties": {
+    "contract_version": {
+      "const": "3.1.0",
+      "default": "3.1.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "request": {
+      "$ref": "#/$defs/ControlRequestKind",
+      "default": "none"
+    },
+    "actor": {
+      "minLength": 1,
+      "title": "Actor",
+      "type": "string"
+    },
+    "rationale": {
+      "minLength": 1,
+      "title": "Rationale",
+      "type": "string"
+    },
+    "requested_at": {
+      "title": "Requested At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project_id",
+    "actor",
+    "rationale"
+  ],
+  "title": "ResearchProjectControl",
+  "type": "object"
+}

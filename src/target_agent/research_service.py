@@ -11,12 +11,13 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from .contracts import EvidenceItem, TaskContext, TaskSpec
+from .contracts import EvidenceItem, TaskContext, TaskSpec, utc_now
 from .graphs import synthesize_evidence_graph
 from .paper_strategy import StrategyPattern
 from .research_contracts import (
     RESEARCH_CONTRACT_VERSION,
     AutonomyMode,
+    ControlRequestKind,
     DecisionAction,
     DecisionEvent,
     DomainActivityPage,
@@ -28,8 +29,11 @@ from .research_contracts import (
     ProjectStatus,
     RepairQueueSnapshot,
     ResearchGoal,
+    ResearchProjectControl,
     ResearchProjectSnapshot,
     ResearchProjectSpec,
+    WorkItemResult,
+    WorkItemStatus,
 )
 from .research_runtime import ResearchProjectRuntime
 from .workflow_catalog import WorkflowCatalog
@@ -230,6 +234,139 @@ class ResearchProjectService:
         resume = state is not None
         self.runtime.run(project, resume=resume)
         return self.snapshot(project_id)
+
+
+    def cancel_project(self, project_id: str, *, actor: str, rationale: str) -> dict[str, Any]:
+        """Cancel a project immediately, or queue cancellation for the next safe boundary.
+
+        If an execution holds the project lock, the request is persisted and the
+        running graph consumes it before starting the next work item. Otherwise
+        the cancellation is applied synchronously. A cancelled project is
+        terminal: no ranking, report, release or downstream artifact is produced.
+        """
+        return self._request_control(project_id, ControlRequestKind.CANCEL, actor, rationale)
+
+    def pause_project(self, project_id: str, *, actor: str, rationale: str) -> dict[str, Any]:
+        """Pause a project immediately, or queue pause for the next safe boundary.
+
+        Pausing never consumes a worker lease or marks work items; resuming
+        continues from the last durable item boundary.
+        """
+        return self._request_control(project_id, ControlRequestKind.PAUSE, actor, rationale)
+
+    def resume_project(self, project_id: str, *, actor: str, rationale: str) -> dict[str, Any]:
+        """Resume a paused (or checkpointed) project and advance until the next stop."""
+        if not actor.strip() or not rationale.strip():
+            raise ResearchDecisionError("actor and rationale are required")
+        store = self._existing_store(project_id)
+        state = store.load_state()
+        if state is not None and state.status in _TERMINAL_PROJECT_STATUSES:
+            # Resume on a terminal project is an idempotent inspect-only no-op,
+            # matching the runtime's terminal-resume semantics (BM-04).
+            return self.snapshot(project_id)
+        pending = store.load_control()
+        if pending is not None and pending.request != ControlRequestKind.NONE:
+            raise ResearchDecisionError(
+                f"a {pending.request.value} control request is pending; resolve it before resuming"
+            )
+        store.append_event(
+            "control_requested", state.status.value if state else "draft",
+            detail={"control": "resume", "actor": actor, "rationale": rationale},
+        )
+        return self.run(project_id)
+
+    def _request_control(
+        self,
+        project_id: str,
+        kind: ControlRequestKind,
+        actor: str,
+        rationale: str,
+    ) -> dict[str, Any]:
+        if not actor.strip() or not rationale.strip():
+            raise ResearchDecisionError("actor and rationale are required")
+        store = self._existing_store(project_id)
+        state = store.load_state()
+        if state is not None and state.status in _TERMINAL_PROJECT_STATUSES:
+            raise ResearchDecisionError("project already reached a terminal state")
+        control = ResearchProjectControl(
+            project_id=project_id, request=kind, actor=actor, rationale=rationale,
+        )
+        store.save_control(control)
+        store.append_event(
+            "control_requested", state.status.value if state else "draft",
+            detail={"control": kind.value, "actor": actor, "rationale": rationale},
+        )
+        applied = False
+        try:
+            with store.execution_lock():
+                if kind == ControlRequestKind.CANCEL:
+                    self._apply_cancel(store, control)
+                else:
+                    self._apply_pause(store, control)
+                applied = True
+        except ProjectBusyError:
+            # An execution holds the project lock; the runtime consumes the
+            # queued request at its next safe work-item boundary.
+            pass
+        snapshot = self.snapshot(project_id)
+        snapshot["control_queued"] = not applied
+        return snapshot
+
+    @staticmethod
+    def _apply_cancel(store: ResearchProjectStore, control: ResearchProjectControl) -> None:
+        spec = store.load_spec()
+        assert spec is not None
+        plan = store.load_plan()
+        revisions = store.read_plan_revisions()
+        results = store.load_work_item_results()
+        active_ids = active_item_ids(plan, revisions) if plan is not None else set()
+        if plan is not None:
+            for item in plan.items:
+                if item.item_id in active_ids and item.item_id not in results:
+                    store.save_work_item_result(WorkItemResult(
+                        item_id=item.item_id, module=item.module, status=WorkItemStatus.SKIPPED,
+                        summary="The project was cancelled before this work item started.",
+                        limitations=[f"Project cancelled by {control.actor}: {control.rationale}"],
+                    ))
+        prior = store.load_state()
+        store.save_state(ProjectState(
+            project_id=spec.project_id, status=ProjectStatus.CANCELLED,
+            current_item_id=prior.current_item_id if prior else None,
+            completed_items=sorted(
+                item_id for item_id, row in results.items()
+                if row.status in {WorkItemStatus.COMPLETED, WorkItemStatus.COMPLETED_WITH_GAPS}
+            ),
+            failed_items=prior.failed_items if prior else [],
+            attempts=prior.attempts if prior else {},
+            terminal_reason=f"Cancelled by {control.actor}: {control.rationale}",
+            updated_at=utc_now(),
+        ))
+        store.append_event("execution_cancelled", "cancelled", detail={
+            "actor": control.actor, "rationale": control.rationale,
+        })
+        store.append_event("project_terminal", "cancelled", detail={
+            "reason": f"Cancelled by {control.actor}: {control.rationale}",
+        })
+        store.clear_control()
+
+    @staticmethod
+    def _apply_pause(store: ResearchProjectStore, control: ResearchProjectControl) -> None:
+        spec = store.load_spec()
+        assert spec is not None
+        prior = store.load_state()
+        store.save_state(ProjectState(
+            project_id=spec.project_id, status=ProjectStatus.PAUSED,
+            current_item_id=prior.current_item_id if prior else None,
+            completed_items=prior.completed_items if prior else [],
+            failed_items=prior.failed_items if prior else [],
+            attempts=prior.attempts if prior else {},
+            terminal_reason=f"Paused by {control.actor}: {control.rationale}",
+            updated_at=utc_now(),
+        ))
+        store.append_event("execution_paused", "paused", detail={
+            "actor": control.actor, "rationale": control.rationale,
+        })
+        store.clear_control()
 
     def accept_checkpoint(
         self,
@@ -1112,6 +1249,11 @@ class ResearchProjectService:
                         and decision.action in {DecisionAction.ACCEPT, DecisionAction.REJECT}
                         for decision in store.read_decisions())
         ]
+        if state.status == ProjectStatus.PAUSED:
+            return [{
+                "action": "resume_project", "project_id": spec.project_id,
+                "reason": state.terminal_reason or "The project is paused; resume to continue.",
+            }]
         if state.status == ProjectStatus.WAITING_REVIEW and pending_repairs:
             request = pending_repairs[0]
             return [{

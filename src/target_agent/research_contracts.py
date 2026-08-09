@@ -9,12 +9,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .contracts import new_id, utc_now
 
 
-RESEARCH_CONTRACT_VERSION = "3.0.0"
+RESEARCH_CONTRACT_VERSION = "3.1.0"
 
 
 class ResearchContract(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
-    contract_version: Literal["3.0.0"] = RESEARCH_CONTRACT_VERSION
+    contract_version: Literal["3.1.0"] = RESEARCH_CONTRACT_VERSION
 
 
 class AutonomyMode(str, Enum):
@@ -27,6 +27,7 @@ class ProjectStatus(str, Enum):
     DRAFT = "draft"
     PLANNED = "planned"
     RUNNING = "running"
+    PAUSED = "paused"
     WAITING_REVIEW = "waiting_review"
     COMPLETED = "completed"
     COMPLETED_WITH_GAPS = "completed_with_gaps"
@@ -44,6 +45,15 @@ class WorkItemStatus(str, Enum):
     BLOCKED = "blocked"
     FAILED = "failed"
     SKIPPED = "skipped"
+
+
+class ControlRequestKind(str, Enum):
+    """Durable user-issued control intent consumed at a safe execution boundary."""
+
+    NONE = "none"
+    PAUSE = "pause"
+    CANCEL = "cancel"
+    RESUME = "resume"
 
 
 class FailureClass(str, Enum):
@@ -832,6 +842,21 @@ class ProjectState(ResearchContract):
         return self
 
 
+class ResearchProjectControl(ResearchContract):
+    """Current control intent for one durable project.
+
+    The request itself is also recorded as an append-only project event; this
+    file is only the latest intent that the runtime consumes at the next safe
+    work-item boundary (or immediately when no execution holds the lock).
+    """
+
+    project_id: str
+    request: ControlRequestKind = ControlRequestKind.NONE
+    actor: str = Field(min_length=1)
+    rationale: str = Field(min_length=1)
+    requested_at: str = Field(default_factory=utc_now)
+
+
 class DomainActivityPage(ResearchContract):
     project_id: str
     activities: list[DomainActivityRecord]
@@ -869,6 +894,7 @@ class ResearchProjectSnapshot(ResearchContract):
     artifact_heads: list[ArtifactHead] = Field(default_factory=list)
     active_work_item_ids: list[str] = Field(default_factory=list)
     active_artifact_ids: list[str] = Field(default_factory=list)
+    control: ResearchProjectControl | None = None
     release_snapshot_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     next_actions: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -886,6 +912,8 @@ class ResearchProjectSnapshot(ResearchContract):
             *self.work_item_heads,
             *self.artifact_heads,
         ]
+        if self.control is not None:
+            project_records.append(self.control)
         if self.state is not None:
             project_records.append(self.state)
         if self.plan is not None:
@@ -908,13 +936,13 @@ TERMINAL_WORK_ITEM_STATUSES = frozenset({
 __all__ = [
     "RESEARCH_CONTRACT_VERSION", "ArtifactHead", "ArtifactRecord", "ArtifactVersion",
     "AssessmentDimension",
-    "AssessmentLevel", "AssessmentRecord", "AssessmentResult", "AutonomyMode", "DataContract",
+    "AssessmentLevel", "AssessmentRecord", "AssessmentResult", "AutonomyMode", "ControlRequestKind", "DataContract",
     "DecisionAction", "DecisionEvent", "DomainActivityPage", "DomainActivityRecord",
     "DomainActivityStatus", "DomainStage", "FailureClass", "ProjectEvent", "ProjectState",
     "ProjectStatus", "RepairAction", "RepairAuthorization", "RepairDirective",
     "RepairQueueSnapshot", "RepairRequest", "RepairResolution", "RepairResolutionStatus",
     "RepairRisk", "ResearchGoal", "ResearchPlan", "ResearchPlanRevision",
-    "ResearchProjectSnapshot", "ResearchProjectSpec", "ReviewTarget", "TERMINAL_WORK_ITEM_STATUSES",
+    "ResearchProjectControl", "ResearchProjectSnapshot", "ResearchProjectSpec", "ReviewTarget", "TERMINAL_WORK_ITEM_STATUSES",
     "WorkAttempt", "WorkAttemptStatus", "WorkItemHead", "WorkItemResult", "WorkItemSpec",
     "WorkItemStatus", "WorkerLease",
 ]

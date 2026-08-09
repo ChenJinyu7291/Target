@@ -3,8 +3,8 @@
   "description": "Durable CAS-updated pointer to the active version of one logical artifact.\n\nVersion rows in artifact_versions.jsonl remain immutable and auditable;\nthis head only states which version is current for consumers such as the\nReviewer, so old versions are never lost.",
   "properties": {
     "contract_version": {
-      "const": "3.0.0",
-      "default": "3.0.0",
+      "const": "3.1.0",
+      "default": "3.1.0",
       "title": "Contract Version",
       "type": "string"
     },

@@ -2,10 +2,10 @@
   "summary": {
     "goldset": "benchmark/goldset_v2.jsonl",
     "live": false,
-    "tasks": 13,
-    "tasks_passed": 13,
-    "assertions": 29,
-    "assertions_passed": 29,
+    "tasks": 14,
+    "tasks_passed": 14,
+    "assertions": 30,
+    "assertions_passed": 30,
     "score": 1.0,
     "categories": {
       "main_chain": {
@@ -29,8 +29,8 @@
         "score": 1.0
       },
       "contract": {
-        "assertions": 5,
-        "passed": 5,
+        "assertions": 6,
+        "passed": 6,
         "score": 1.0
       }
     }
@@ -135,7 +135,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.26
+      "elapsed_s": 0.25
     },
     {
       "id": "BM-02",
@@ -168,7 +168,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.69
+      "elapsed_s": 0.37
     },
     {
       "id": "BM-03",
@@ -186,7 +186,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 1.18
+      "elapsed_s": 0.7
     },
     {
       "id": "BM-04",
@@ -203,7 +203,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.5
+      "elapsed_s": 0.28
     },
     {
       "id": "BM-05",
@@ -221,7 +221,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.78
+      "elapsed_s": 0.5
     },
     {
       "id": "BM-06",
@@ -250,7 +250,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.39
+      "elapsed_s": 0.18
     },
     {
       "id": "BM-07",
@@ -284,7 +284,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.14
+      "elapsed_s": 0.1
     },
     {
       "id": "BM-08",
@@ -311,7 +311,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.1
+      "elapsed_s": 0.3
     },
     {
       "id": "BM-09",
@@ -365,7 +365,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 0.98
+      "elapsed_s": 0.99
     },
     {
       "id": "BM-12",
@@ -383,7 +383,7 @@
         }
       ],
       "passed": true,
-      "elapsed_s": 1.26
+      "elapsed_s": 1.27
     },
     {
       "id": "BM-13",
@@ -429,6 +429,24 @@
       "skipped": true,
       "results": [],
       "passed": null
+    },
+    {
+      "id": "BM-14",
+      "title": "Blind target-ranking protocol synthetic demo (freeze + score + non-compensating gates)",
+      "category": "contract",
+      "mode": "unit",
+      "results": [
+        {
+          "assertion": {
+            "type": "unit",
+            "check": "blind_protocol_synthetic"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.0
     }
   ]
 }

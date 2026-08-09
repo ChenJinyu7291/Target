@@ -17,11 +17,16 @@ from .research_contracts import (
     ArtifactHead, ArtifactRecord, ArtifactVersion, AssessmentRecord, DataContract, DecisionEvent,
     DomainActivityPage, DomainActivityRecord, ForkDirective, PlanBranch, ProjectEvent,
     ProjectState, RepairDirective, RepairQueueSnapshot, RepairRequest, RepairResolution,
-    ResearchGoal, ResearchPlan, ResearchPlanRevision, ResearchProjectSnapshot,
-    ResearchProjectSpec, ReviewTarget, WorkAttempt, WorkItemHead, WorkItemResult, WorkItemSpec,
-    WorkerLease,
+    ResearchGoal, ResearchPlan, ResearchPlanRevision, ResearchProjectControl,
+    ResearchProjectSnapshot, ResearchProjectSpec, ReviewTarget, WorkAttempt, WorkItemHead,
+    WorkItemResult, WorkItemSpec, WorkerLease,
 )
 from .blind_benchmark import BlindBenchmarkManifest, BlindLabelSet
+
+
+# Hand-maintained schemas that the exporter must never delete; they describe
+# benchmark fixtures that are not Pydantic product contracts.
+PRESERVED_SCHEMAS = frozenset({"context_relation_case.schema.json"})
 
 
 MODELS = {
@@ -77,6 +82,7 @@ MODELS = {
     "research_repair_queue": RepairQueueSnapshot,
     "research_project_snapshot": ResearchProjectSnapshot,
     "research_project_state": ProjectState,
+    "research_project_control": ResearchProjectControl,
     "blind_benchmark_manifest": BlindBenchmarkManifest,
     "blind_benchmark_labels": BlindLabelSet,
 }
@@ -86,6 +92,8 @@ def export_schemas(output_dir: Path) -> list[Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     expected = {f"{name}.schema.json" for name in MODELS}
     for stale in output_dir.glob("*.schema.json"):
+        if stale.name in PRESERVED_SCHEMAS:
+            continue
         if stale.name not in expected:
             stale.unlink()
     written = []

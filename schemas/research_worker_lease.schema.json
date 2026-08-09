@@ -3,8 +3,8 @@
   "description": "CAS-bound claim that one worker may execute one work item attempt.",
   "properties": {
     "contract_version": {
-      "const": "3.0.0",
-      "default": "3.0.0",
+      "const": "3.1.0",
+      "default": "3.1.0",
       "title": "Contract Version",
       "type": "string"
     },

@@ -121,7 +121,7 @@ function statusClass(status) {
     case 'completed_with_gaps': return 'conditional';
     case 'needs_input': case 'waiting_review': return 'conditional';
     case 'failed': case 'blocked': case 'cancelled': return 'danger';
-    case 'running': case 'planned': case 'pending': return 'blue';
+    case 'running': case 'planned': case 'paused': case 'pending': return 'blue';
     default: return '';
   }
 }
@@ -582,6 +582,7 @@ function renderNextActions(snap) {
   const actions = snap.next_actions || [];
   if (!actions.length) {
     host.innerHTML = '<span class="muted">无待办审批</span>';
+    renderControlButtons(snap, host);
     return;
   }
   for (const action of actions) {
@@ -605,6 +606,51 @@ function renderNextActions(snap) {
     button.title = action.reason || '';
     button.addEventListener('click', () => runAction(snap, action, true));
     host.appendChild(button);
+  }
+  renderControlButtons(snap, host);
+}
+
+function controlButton(label, cls, handler) {
+  const button = document.createElement('button');
+  button.className = cls;
+  button.type = 'button';
+  button.textContent = label;
+  button.addEventListener('click', handler);
+  return button;
+}
+
+function renderControlButtons(snap, host) {
+  const status = snap.state ? snap.state.status : 'draft';
+  const projectId = snap.spec.project_id;
+  const actor = currentActor();
+  const add = (label, cls, url, okText) => {
+    const button = controlButton(label, cls, async () => {
+      if (!actor) {
+        toast('请先选择或新建一个可审批会话（研究员/审阅者/管理员）', 'error');
+        return;
+      }
+      try {
+        await api(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ actor, rationale: okText + '（工作台操作）' }),
+        });
+        toast(okText);
+      } catch (error) {
+        toast(error.message, 'error');
+      }
+      setTimeout(pollProject, 300);
+    });
+    host.appendChild(button);
+  };
+  if (status === 'running') {
+    add('暂停', 'ghost', `/api/projects/${projectId}/pause`, '已请求暂停');
+    add('取消', 'danger', `/api/projects/${projectId}/cancel`, '已请求取消');
+  } else if (status === 'paused') {
+    add('继续执行', 'primary', `/api/projects/${projectId}/resume`, '已请求继续');
+    add('取消', 'danger', `/api/projects/${projectId}/cancel`, '已请求取消');
+  } else if (['draft', 'planned', 'needs_input', 'waiting_review'].includes(status)) {
+    add('取消项目', 'danger', `/api/projects/${projectId}/cancel`, '项目已取消');
   }
 }
 
@@ -650,8 +696,12 @@ async function runAction(snap, action, approve) {
         }),
       });
       toast(approve ? '回退已批准，正在继续' : '回退已拒绝');
-    } else if (action.action === 'run_project') {
-      await api(`/api/projects/${projectId}/resume`, { method: 'POST' });
+    } else if (action.action === 'run_project' || action.action === 'resume_project') {
+      await api(`/api/projects/${projectId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actor, rationale: 'Resumed from the web workbench.' }),
+      });
       toast('已排队继续执行');
     }
   } catch (error) {

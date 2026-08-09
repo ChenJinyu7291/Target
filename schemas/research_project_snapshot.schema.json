@@ -5,8 +5,8 @@
       "description": "Durable CAS-updated pointer to the active version of one logical artifact.\n\nVersion rows in artifact_versions.jsonl remain immutable and auditable;\nthis head only states which version is current for consumers such as the\nReviewer, so old versions are never lost.",
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -100,8 +100,8 @@
       "additionalProperties": false,
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -169,8 +169,8 @@
       "description": "Immutable content-addressable version of one logical artifact.",
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -288,8 +288,8 @@
       "additionalProperties": false,
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -381,13 +381,24 @@
       "title": "AutonomyMode",
       "type": "string"
     },
+    "ControlRequestKind": {
+      "description": "Durable user-issued control intent consumed at a safe execution boundary.",
+      "enum": [
+        "none",
+        "pause",
+        "cancel",
+        "resume"
+      ],
+      "title": "ControlRequestKind",
+      "type": "string"
+    },
     "DataContract": {
       "additionalProperties": false,
       "description": "Small deterministic boundary contract; no runtime JSON-schema dependency.",
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -447,8 +458,8 @@
       "additionalProperties": false,
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -529,8 +540,8 @@
       "description": "Immutable user-issued intent to roll a project back to a work item.",
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -623,8 +634,8 @@
       "description": "Append-only snapshot of one user-issued rollback branch.\n\nStatus transitions append new snapshots; ``read_branches`` returns the\nlatest snapshot per branch id so the branch history stays auditable.",
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -809,8 +820,8 @@
       "additionalProperties": false,
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -927,6 +938,7 @@
         "draft",
         "planned",
         "running",
+        "paused",
         "waiting_review",
         "completed",
         "completed_with_gaps",
@@ -967,8 +979,8 @@
       "description": "Immutable assessment-triggered request evaluated by deterministic policy.",
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -1111,8 +1123,8 @@
       "additionalProperties": false,
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -1208,8 +1220,8 @@
       "additionalProperties": false,
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -1254,8 +1266,8 @@
       "additionalProperties": false,
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -1318,8 +1330,8 @@
       "description": "Append-only execution overlay; never a free-form replacement plan.",
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -1469,12 +1481,53 @@
       "title": "ResearchPlanRevision",
       "type": "object"
     },
+    "ResearchProjectControl": {
+      "additionalProperties": false,
+      "description": "Current control intent for one durable project.\n\nThe request itself is also recorded as an append-only project event; this\nfile is only the latest intent that the runtime consumes at the next safe\nwork-item boundary (or immediately when no execution holds the lock).",
+      "properties": {
+        "contract_version": {
+          "const": "3.1.0",
+          "default": "3.1.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "request": {
+          "$ref": "#/$defs/ControlRequestKind",
+          "default": "none"
+        },
+        "actor": {
+          "minLength": 1,
+          "title": "Actor",
+          "type": "string"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "requested_at": {
+          "title": "Requested At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "actor",
+        "rationale"
+      ],
+      "title": "ResearchProjectControl",
+      "type": "object"
+    },
     "ResearchProjectSpec": {
       "additionalProperties": false,
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -1576,8 +1629,8 @@
       "description": "Immutable set of artifact/result digests that a Reviewer may assess.",
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -1662,8 +1715,8 @@
       "description": "Immutable attempt record for one work-item execution.",
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -1805,8 +1858,8 @@
       "description": "Durable CAS-updated pointer to the committed result of one work item.\n\nThe head is authoritative: the working result.json is only a mirror of\nthe immutable attempt snapshot it references, so recovery never guesses\nbusiness state from Trace events. Replaying the same committed attempt is\nan idempotent no-op.",
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -1874,8 +1927,8 @@
       "additionalProperties": false,
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -2017,8 +2070,8 @@
       "additionalProperties": false,
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -2169,8 +2222,8 @@
       "description": "CAS-bound claim that one worker may execute one work item attempt.",
       "properties": {
         "contract_version": {
-          "const": "3.0.0",
-          "default": "3.0.0",
+          "const": "3.1.0",
+          "default": "3.1.0",
           "title": "Contract Version",
           "type": "string"
         },
@@ -2244,8 +2297,8 @@
   "additionalProperties": false,
   "properties": {
     "contract_version": {
-      "const": "3.0.0",
-      "default": "3.0.0",
+      "const": "3.1.0",
+      "default": "3.1.0",
       "title": "Contract Version",
       "type": "string"
     },
@@ -2412,6 +2465,17 @@
       },
       "title": "Active Artifact Ids",
       "type": "array"
+    },
+    "control": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResearchProjectControl"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "release_snapshot_digest": {
       "anyOf": [

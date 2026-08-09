@@ -43,7 +43,7 @@ def test_project_post_get_events_and_artifact_download_use_durable_state(tmp_pat
     }
     response = _wait_for_project(client, project.project_id)
     payload = response.get_json()
-    assert payload["contract_version"] == "3.0.0"
+    assert payload["contract_version"] == "3.1.0"
     assert payload["spec"]["goal"]["question"] == project.goal.question
     assert payload["state"]["status"] == "completed"
     assert len(payload["plan"]["items"]) == 5
@@ -64,7 +64,7 @@ def test_project_post_get_events_and_artifact_download_use_durable_state(tmp_pat
     activities = client.get(f"/api/projects/{project.project_id}/activities")
     assert activities.status_code == 200
     assert activities.get_json() == {
-        "contract_version": "3.0.0",
+        "contract_version": "3.1.0",
         "project_id": project.project_id,
         "activities": [],
         "next_cursor": 0,

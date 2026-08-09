@@ -43,6 +43,7 @@ from .research_contracts import (
     RepairDirective,
     RepairRequest,
     RepairResolution,
+    ResearchProjectControl,
     RepairResolutionStatus,
     ResearchPlan,
     ResearchPlanRevision,
@@ -387,6 +388,29 @@ class ResearchProjectStore:
 
     def load_state(self) -> ProjectState | None:
         return self._read_model(self.project_dir / "project_state.json", ProjectState)
+    def save_control(self, control: ResearchProjectControl) -> None:
+        """Atomically record the latest user control intent (pause/cancel/resume).
+
+        The request is additionally written to the append-only event ledger by
+        the service before it is saved here, so the ledger remains the durable
+        audit trail and this file is only the current intent.
+        """
+        if control.project_id != self.project_id:
+            raise ValueError("control project id does not match store project id")
+        with self._lock:
+            self._write_json_atomic(self.project_dir / "control.json", control)
+
+    def load_control(self) -> ResearchProjectControl | None:
+        return self._read_model(self.project_dir / "control.json", ResearchProjectControl)
+
+    def clear_control(self) -> None:
+        """Remove the current control intent after the runtime consumed it."""
+        with self._lock:
+            path = self.project_dir / "control.json"
+            if path.exists():
+                path.unlink()
+            self._fsync_directory(self.project_dir)
+
 
     def save_work_item_result(self, result: WorkItemResult) -> None:
         item_id = self._safe_component(result.item_id, "work item id")

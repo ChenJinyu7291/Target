@@ -27,7 +27,7 @@ Disease -> GEO/CELLxGENE discovery -> metadata audit -> reviewed analysis recipe
 - ClinicalTrials.gov API v2 adds gene-named trial-registry evidence (`clinical_trials_gov`); claims are emitted only when the intervention or title text explicitly names the gene, and stopped trials are downgraded to uncertain.
 - The literature tool upgrades to full-text-aware RAG: open-access PMC full texts are section-parsed into a persistent shared FTS5 corpus with optional LLM reranking and bm25 fallback.
 - Two execution engines ship and are parity-tested: the legacy hand-rolled state machine and the LangGraph `StateGraph` runtime (default; `--runtime legacy` opts out). Both write contract-compatible, parity-tested observable artifacts and share the same checkpoint/resume contract.
-- A systematic benchmark lives in [benchmark/](benchmark/): `benchmark/goldset_v2.jsonl` defines 13 non-live contract/regression tasks (BM-01..BM-13, fake+unit modes) plus 3 opt-in live tasks (BM-L1..BM-L3), covering the main chain, robustness, determinism, recovery, contract gates and engine parity; `python benchmark/runner.py` must score 100% in fake+unit mode. `benchmark/results/benchmark_report.json` was refreshed on the remote profile on 2026-08-09: 14 tasks / 30 assertions / score 1.0 in non-live mode; live tasks require an explicit `--live` run. This is not an external blind biological result.
+- A systematic benchmark lives in [benchmark/](benchmark/): `benchmark/goldset_v2.jsonl` defines 14 non-live contract/regression tasks (BM-01..BM-14, fake+unit modes) plus 3 opt-in live tasks (BM-L1..BM-L3), covering the main chain, robustness, determinism, recovery, contract gates and engine parity; `python benchmark/runner.py` must score 100% in fake+unit mode. `benchmark/results/benchmark_report.json` was refreshed on the remote profile on 2026-08-10: 14 tasks / 30 assertions / score 1.0 in non-live mode; live tasks require an explicit `--live` run. This is not an external blind biological result.
 - The Reviewer LoRA pipeline (data + training + heldout evaluation + remote GPU runbook) is under [training/](training/); local CPU smoke is verified, full training runs on the external GPU profile only. At runtime the trained adapter acts as an optional probe-based confirmation layer inside the Reviewer (configure `TARGET_AGENT_REVIEWER_LORA_BASE`/`TARGET_AGENT_REVIEWER_LORA_ADAPTER`): deterministic gates stay authoritative, adapter answers are category-cross-checked and silently discarded on any parse/category failure, and SFT categories are mapped onto the canonical finding taxonomy before a ReviewerFinding is emitted.
 - The externally stored Reviewer adapter used in prior acceptance was trained on the earlier generic V2.1 failure taxonomy; model weights are not tracked in Git. V2.2 genetics gates are deterministic and authoritative; genetics-specific alignment examples require fresh scientific and engineering review and retraining before any model-alignment claim is upgraded.
 - PyDESeq2 accepts non-negative integer counts only. Continuous expression requires the explicitly enabled fixed limma backend.
@@ -144,14 +144,14 @@ target-agent kernel stop --kernel-id <id>
 target-agent kernel stop-all
 ```
 
-## 双合同版本（TaskSpec 2.2.0 / ResearchProjectSpec 3.0.0）
+## 双合同版本（TaskSpec 2.2.0 / ResearchProjectSpec 3.1.0）
 
 仓库同时出现两个合同版本，分工不同：
 
 - **科学输入合同 `TaskSpec 2.2.0`**（[contracts.py](src/target_agent/contracts.py)，`CONTRACT_VERSION=2.2.0`）：描述疾病靶点发现任务本身的输入——疾病、组织、细胞类型、阶段、表型、约束与数据偏好；JSON Schema 由 Pydantic 生成。
-- **项目控制面合同 `ResearchProjectSpec 3.0.0`**（[research_contracts.py](src/target_agent/research_contracts.py)，`RESEARCH_CONTRACT_VERSION=3.0.0`）：描述不可变研究项目的控制面——goal、autonomy_mode、工作项/修复/回退预算（max_work_items / max_replans / max_forks）、workflow 模板绑定（SHA-256 冻结）与快照绑定决策。
+- **项目控制面合同 `ResearchProjectSpec 3.1.0`**（[research_contracts.py](src/target_agent/research_contracts.py)，`RESEARCH_CONTRACT_VERSION=3.1.0`）：描述不可变研究项目的控制面——goal、autonomy_mode、工作项/修复/回退预算（max_work_items / max_replans / max_forks）、workflow 模板绑定（SHA-256 冻结）与快照绑定决策。
 
-Web 工作台能力条按“科学合同 2.2.0 · 项目合同 3.0.0”显示；创建项目时前者写入 `context.target_task_spec.contract_version`，后者写入项目 spec 顶层 `contract_version`。
+Web 工作台能力条按“科学合同 2.2.0 · 项目合同 3.1.0”显示；创建项目时前者写入 `context.target_task_spec.contract_version`，后者写入项目 spec 顶层 `contract_version`。
 
 ## Executable workflow templates
 
@@ -220,6 +220,13 @@ target-agent project-fork-propose --project-id project-alzheimer-example \
   --rationale "Rerun with bounded inputs"
 target-agent project-fork-decision --project-id project-alzheimer-example \
   --branch-id branch-xxx --approve --actor reviewer --rationale "Approved"
+# Pause/cancel/resume are safe-boundary control-plane operations:
+target-agent project-pause --project-id project-alzheimer-example \
+  --actor reviewer --rationale "Review intermediate evidence"
+target-agent project-resume --project-id project-alzheimer-example \
+  --actor reviewer --rationale "Continue after review"
+target-agent project-cancel --project-id project-alzheimer-example \
+  --actor reviewer --rationale "Abandon; no report is generated"
 target-agent session create --project-id project-alzheimer-example --role reviewer
 target-agent session list --project-id project-alzheimer-example
 target-agent session post --project-id project-alzheimer-example \
@@ -235,7 +242,12 @@ The V3 HTTP surface adds `POST /api/projects`, `GET /api/projects/{project_id}`,
 `GET /api/projects/{project_id}/events`, `GET /api/projects/{project_id}/activities`,
 `GET /api/projects/{project_id}/repairs`,
 `POST /api/projects/{project_id}/repairs/{repair_request_id}/decision`,
-`POST /api/projects/{project_id}/decisions` and content-addressed artifact downloads. The activity
+`POST /api/projects/{project_id}/decisions`,
+`POST /api/projects/{project_id}/pause`, `POST /api/projects/{project_id}/cancel`,
+`POST /api/projects/{project_id}/resume` and content-addressed artifact downloads.
+Pause/cancel are honored at safe work-item boundaries while a run is active and
+applied immediately when no execution holds the project lock; a cancelled
+project never produces a ranking, report or release. The activity
 endpoint pages through a safe projection of the authoritative child Trace: domain stage, tool status,
 coverage and source IDs are visible while candidates, evidence text and ranking values remain in the
 checksum-bound scientific artifacts. `checkpointed` projects require plan and release acceptance;

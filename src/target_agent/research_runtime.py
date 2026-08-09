@@ -11,11 +11,12 @@ from langgraph.graph import END, START, StateGraph
 from .contracts import utc_now
 from .llm import StepClient
 from .research_contracts import (
-    AssessmentDimension, AssessmentLevel, AssessmentRecord, AssessmentResult, AutonomyMode, DataContract,
+    AssessmentDimension, AssessmentLevel, AssessmentRecord, AssessmentResult, AutonomyMode,
+    ControlRequestKind, DataContract,
     DecisionAction, DecisionEvent, FailureClass, ForkDirective, ForkMode, PlanBranch,
     PlanBranchStatus, ProjectState,
     ProjectStatus, RepairAction, RepairAuthorization, RepairResolutionStatus, ResearchPlan,
-    ResearchProjectSpec, ReviewTarget,
+    ResearchProjectControl, ResearchProjectSpec, ReviewTarget,
     TERMINAL_WORK_ITEM_STATUSES,
     WorkAttempt, WorkAttemptStatus, WorkItemHead, WorkItemResult, WorkItemSpec, WorkItemStatus,
     WorkerLease,
@@ -58,6 +59,8 @@ class ResearchRuntimeState(TypedDict, total=False):
     early_terminal: bool
     execution_done: bool
     execution_paused: bool
+    cancelled: bool
+    control: ResearchProjectControl | None
 
 
 class _InputContractError(ValueError):
@@ -156,24 +159,27 @@ class ResearchProjectRuntime:
         )
         graph.add_conditional_edges(
             "fork", lambda state: (
+                "cancelled" if state.get("cancelled") else
                 "pause" if state.get("execution_paused") else
                 "execute" if not state.get("execution_done", True) else "finalize"
             ),
-            {"pause": END, "execute": "execute", "finalize": "finalize"},
+            {"cancelled": END, "pause": END, "execute": "execute", "finalize": "finalize"},
         )
         graph.add_conditional_edges(
             "execute", lambda state: (
+                "cancelled" if state.get("cancelled") else
                 "pause" if state.get("execution_paused") else
                 "repair" if state["execution_done"] else "execute"
             ),
-            {"pause": END, "execute": "execute", "repair": "repair"},
+            {"cancelled": END, "pause": END, "execute": "execute", "repair": "repair"},
         )
         graph.add_conditional_edges(
             "repair", lambda state: (
+                "cancelled" if state.get("cancelled") else
                 "pause" if state.get("execution_paused") else
                 "execute" if not state.get("execution_done", True) else "fork"
             ),
-            {"pause": END, "execute": "execute", "fork": "fork"},
+            {"cancelled": END, "pause": END, "execute": "execute", "fork": "fork"},
         )
         graph.add_edge("finalize", END)
         return graph.compile()
@@ -207,6 +213,15 @@ class ResearchProjectRuntime:
             raise ValueError("project already reached a terminal state; use resume to inspect it")
         if prior_state is not None and not state.get("resume"):
             raise ValueError("project already has durable progress; use resume to continue it")
+        control = store.load_control()
+        if control is not None and control.request == ControlRequestKind.CANCEL:
+            self._apply_cancel(store, project, recovered, control)
+            return {"project": project, "store": store, "early_terminal": True,
+                    "results": recovered, "cancelled": True}
+        if control is not None and control.request == ControlRequestKind.PAUSE:
+            self._apply_pause(store, project, recovered, control)
+            return {"project": project, "store": store, "early_terminal": True,
+                    "results": recovered, "execution_paused": True}
         next_state = ProjectState(
             project_id=project.project_id, status=ProjectStatus.RUNNING,
             completed_items=(prior_state.completed_items if prior_state else []),
@@ -344,6 +359,14 @@ class ResearchProjectRuntime:
         revisions = store.read_plan_revisions()
         active_ids = active_item_ids(plan, revisions)
         pending = [item for item in plan.items if item.item_id in active_ids and item.item_id not in results]
+        control = store.load_control()
+        if control is not None and control.request == ControlRequestKind.CANCEL:
+            self._apply_cancel(store, project, results, control)
+            return {"results": results, "execution_done": True, "execution_paused": False,
+                    "cancelled": True}
+        if control is not None and control.request == ControlRequestKind.PAUSE:
+            self._apply_pause(store, project, results, control)
+            return {"results": results, "execution_done": False, "execution_paused": True}
         if not pending:
             return {"results": results, "execution_done": True, "execution_paused": False}
         item = next((candidate for candidate in pending
@@ -556,6 +579,74 @@ class ResearchProjectRuntime:
             store.release_lease(lease.lease_id)
         return {"results": results, "execution_done": active_ids.issubset(results),
                 "execution_paused": False}
+
+    def _apply_cancel(
+        self,
+        store: ResearchProjectStore,
+        project: ResearchProjectSpec,
+        results: dict[str, WorkItemResult],
+        control: ResearchProjectControl,
+    ) -> None:
+        """Persist a durable CANCELLED terminal state at a safe boundary.
+
+        Every active work item that never started is recorded as SKIPPED so
+        the ledger stays complete; the graph then exits before finalize, which
+        means no ranking, report, release or downstream artifact is produced.
+        """
+        plan = store.load_plan()
+        revisions = store.read_plan_revisions()
+        active_ids = active_item_ids(plan, revisions) if plan is not None else set()
+        existing = set(results)
+        if plan is not None:
+            for item in plan.items:
+                if item.item_id in active_ids and item.item_id not in existing:
+                    store.save_work_item_result(WorkItemResult(
+                        item_id=item.item_id, module=item.module, status=WorkItemStatus.SKIPPED,
+                        summary="The project was cancelled before this work item started.",
+                        limitations=[f"Project cancelled by {control.actor}: {control.rationale}"],
+                    ))
+        prior = store.load_state() or ProjectState(project_id=project.project_id)
+        store.save_state(ProjectState(
+            project_id=project.project_id, status=ProjectStatus.CANCELLED,
+            current_item_id=prior.current_item_id,
+            completed_items=_completed_item_ids(results), failed_items=prior.failed_items,
+            attempts=prior.attempts,
+            terminal_reason=f"Cancelled by {control.actor}: {control.rationale}",
+            updated_at=utc_now(),
+        ))
+        store.append_event("execution_cancelled", "cancelled", detail={
+            "actor": control.actor, "rationale": control.rationale,
+        })
+        store.append_event("project_terminal", "cancelled", detail={
+            "reason": f"Cancelled by {control.actor}: {control.rationale}",
+        })
+        store.clear_control()
+
+    def _apply_pause(
+        self,
+        store: ResearchProjectStore,
+        project: ResearchProjectSpec,
+        results: dict[str, WorkItemResult],
+        control: ResearchProjectControl,
+    ) -> None:
+        """Persist PAUSED at a safe boundary without consuming work or leases.
+
+        A later resume simply runs the graph again; completed items are kept
+        and the same control intent is cleared because it has been honored.
+        """
+        prior = store.load_state() or ProjectState(project_id=project.project_id)
+        store.save_state(ProjectState(
+            project_id=project.project_id, status=ProjectStatus.PAUSED,
+            current_item_id=prior.current_item_id,
+            completed_items=_completed_item_ids(results), failed_items=prior.failed_items,
+            attempts=prior.attempts,
+            terminal_reason=f"Paused by {control.actor}: {control.rationale}",
+            updated_at=utc_now(),
+        ))
+        store.append_event("execution_paused", "paused", detail={
+            "actor": control.actor, "rationale": control.rationale,
+        })
+        store.clear_control()
 
     @staticmethod
     def _record_domain_activity(
@@ -872,6 +963,15 @@ class ResearchProjectRuntime:
         supersedes the descendant closure and re-runs the replacement items.
         """
         store, project = state["store"], state["project"]
+        control = store.load_control()
+        if control is not None and control.request == ControlRequestKind.CANCEL:
+            self._apply_cancel(store, project, state["results"], control)
+            return {"plan": state["plan"], "results": state["results"],
+                    "execution_done": True, "execution_paused": False, "cancelled": True}
+        if control is not None and control.request == ControlRequestKind.PAUSE:
+            self._apply_pause(store, project, state["results"], control)
+            return {"plan": state["plan"], "results": state["results"],
+                    "execution_done": False, "execution_paused": True}
         base_plan = store.load_plan()
         if base_plan is None:
             return {"plan": state["plan"], "results": state["results"],
@@ -1095,6 +1195,15 @@ class ResearchProjectRuntime:
     def _repair(self, state: ResearchRuntimeState) -> dict[str, Any]:
         """Apply one deterministic Reviewer-triggered execution overlay."""
         store, project = state["store"], state["project"]
+        control = store.load_control()
+        if control is not None and control.request == ControlRequestKind.CANCEL:
+            self._apply_cancel(store, project, state["results"], control)
+            return {"plan": state["plan"], "results": state["results"],
+                    "execution_done": True, "execution_paused": False, "cancelled": True}
+        if control is not None and control.request == ControlRequestKind.PAUSE:
+            self._apply_pause(store, project, state["results"], control)
+            return {"plan": state["plan"], "results": state["results"],
+                    "execution_done": False, "execution_paused": True}
         base_plan = store.load_plan()
         if base_plan is None:
             raise RuntimeError("repair gate requires an immutable base plan")

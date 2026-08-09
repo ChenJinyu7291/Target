@@ -19,8 +19,8 @@
   "description": "Durable CAS-updated pointer to the committed result of one work item.\n\nThe head is authoritative: the working result.json is only a mirror of\nthe immutable attempt snapshot it references, so recovery never guesses\nbusiness state from Trace events. Replaying the same committed attempt is\nan idempotent no-op.",
   "properties": {
     "contract_version": {
-      "const": "3.0.0",
-      "default": "3.0.0",
+      "const": "3.1.0",
+      "default": "3.1.0",
       "title": "Contract Version",
       "type": "string"
     },

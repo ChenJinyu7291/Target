@@ -80,6 +80,42 @@ def create_mcp_server(
         return product.run(project_id)
 
     @server.tool()
+    def target_pause_project(
+        project_id: Annotated[str, Field(min_length=1)],
+        actor: str,
+        rationale: str,
+    ) -> dict[str, Any]:
+        """Pause a project at its next safe work-item boundary.
+
+        The request is recorded in the project ledger; if no execution is
+        running it is applied immediately. Resuming continues from the last
+        durable boundary.
+        """
+        return product.pause_project(project_id=project_id, actor=actor, rationale=rationale)
+
+    @server.tool()
+    def target_cancel_project(
+        project_id: Annotated[str, Field(min_length=1)],
+        actor: str,
+        rationale: str,
+    ) -> dict[str, Any]:
+        """Cancel a project durably; no ranking, report or release is produced.
+
+        If an execution is running, cancellation takes effect before the next
+        work item starts; otherwise it is applied immediately.
+        """
+        return product.cancel_project(project_id=project_id, actor=actor, rationale=rationale)
+
+    @server.tool()
+    def target_resume_project(
+        project_id: Annotated[str, Field(min_length=1)],
+        actor: str,
+        rationale: str,
+    ) -> dict[str, Any]:
+        """Resume a paused project and advance until its next stop."""
+        return product.resume_project(project_id=project_id, actor=actor, rationale=rationale)
+
+    @server.tool()
     def target_get_project(project_id: Annotated[str, Field(min_length=1)]) -> dict[str, Any]:
         """Read the safe durable projection of a Target research project."""
         return product.snapshot(project_id)

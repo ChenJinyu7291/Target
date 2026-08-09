@@ -2,6 +2,19 @@
 
 Cross-module contracts, workflow choices, model boundaries and scientific-safety decisions are recorded here. Accepted decisions must not be changed silently in a feature branch.
 
+## 2026-08-10 - Round-4: 用户控制面（pause/cancel/resume）与盲测排名协议（BM-14）
+
+- **Status:** accepted
+- 项目控制面新增 `ResearchProjectControl`（`research_contracts.py`，版本升至 `3.1.0`）：pause / cancel / resume 请求先写入 append-only 事件账本，再作为 `control.json` 当前意图被运行时消费；请求本身可审计，消费后清除。
+- 取消/暂停只在安全点生效：`_execute_one` 每个工作项边界、`_repair` 与 `_fork` 入口、以及 `_intake` 启动前。运行中收到请求时排队，空闲时由 Service 在持锁情况下立即应用，避免与执行中的图竞争。
+- 取消是终态：所有未启动的活跃工作项落 `SKIPPED`，项目状态为 `CANCELLED`，跳过 finalize——不生成 ranking、报告、release 或下游产物；对已终态项目再次取消返回 409。
+- 暂停是非终态：保留已完成工作项与 attempts，状态为 `PAUSED`，不消费租约；`resume` 从最后一个持久边界继续。终态项目上的 resume 保持幂等只读（与 BM-04 语义一致）。
+- 接口面：HTTP `POST /api/projects/{id}/pause|cancel|resume`、CLI `project-pause/project-cancel/project-resume`、MCP `target_pause_project/target_cancel_project/target_resume_project`、Web 工作台按钮（运行中暂停/取消、暂停后继续/取消、空闲取消）。
+- 盲测靶点排名协议增加可执行合成夹具（BM-14）：`benchmark/demo_blind_ranking.py` + `benchmark/blind_demo_labels.json` 覆盖 freeze→score 全链路、摘要冻结、防篡改结构门禁与 trap/safety 非补偿门禁；合成夹具仅用于 CI 协议验证，不声称生物学性能，真实发布仍需外部专家标签与主办方控制的 scorer。
+- `blind_ranking.py freeze --case` 接受一个或多个 `CASE_ID=RUN_ID=DISEASE_GROUP_ID`；benchmark 非 live 任务增至 BM-01..BM-14，`benchmark/runner.py` 全部通过。
+- `export-schemas` 不再删除手工维护的 benchmark schema（`context_relation_case.schema.json`），只维护 Pydantic 导出集合。
+- 远程验收（2026-08-10）：全量 pytest 571 passed / 2 skipped；round-4 聚焦测试 14 passed；benchmark 14 tasks / 30 assertions / score 1.0；schema 55 生成 + 1 手写 = 56 一致；repo_policy_check OK。
+
 ## 2026-08-09 - Round-2 全项目审计修复与 Round-3 产品收口
 
 - **Status:** accepted

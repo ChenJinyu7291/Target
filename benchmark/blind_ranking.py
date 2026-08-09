@@ -81,8 +81,8 @@ def main() -> int:
     freeze_parser.add_argument("--split-id", required=True)
     freeze_parser.add_argument("--runs", type=Path, required=True)
     freeze_parser.add_argument(
-        "--case", action="append", required=True,
-        help="CASE_ID=RUN_ID=DISEASE_GROUP_ID; repeat per case",
+        "--case", nargs="+", required=True,
+        help="CASE_ID=RUN_ID=DISEASE_GROUP_ID; pass one or more cases after --case",
     )
     freeze_parser.add_argument("--k", type=int, default=10)
     freeze_parser.add_argument("--policy", type=Path, required=True,

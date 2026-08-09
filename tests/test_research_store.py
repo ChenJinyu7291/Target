@@ -269,7 +269,7 @@ def test_domain_activity_integrity_rejects_sequence_and_source_tampering(tmp_pat
     store = initialized_store(tmp_path)
     path = store.project_dir / "domain_activities.jsonl"
     path.write_text(json.dumps({
-        "contract_version": "3.0.0",
+        "contract_version": "3.1.0",
         "sequence": 2,
         "activity_id": "trace-one",
         "project_id": store.project_id,

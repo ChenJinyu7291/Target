@@ -1,6 +1,6 @@
 # Target 已完成能力与证据边界
 
-> 状态日期：2026-08-08  
+> 状态日期：2026-08-10
 > 本文只记录仓库中已经实现且有检查路径的能力；未完成项不会写成产品能力。具体远程验收事实见 [docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md)。
 
 ## 1. 已完成的科学主链
@@ -433,3 +433,11 @@ typed transient failure
 - 质量门：CI 收集必红修复（pandas 等可选重依赖全部改为函数内懒加载）；新增 60 个直接覆盖（候选门禁、resume 共享校验、NO_GO 语义、快照元数据、连续表达保护等）。
 - Schema 全量重导出：54 个生成 schema + 1 个手写 context-relation 基准 schema，导出与仓库一致。
 - 远程验收（部署 profile 环境）：全量 pytest 559 collected / 557 passed / 2 skipped；benchmark 13 tasks / 29 assertions / score 1.0；repo_policy_check OK。
+
+## 22. 2026-08-10 Round-4：控制面与盲测协议（远程验收通过）
+
+- 用户控制面 `pause / cancel / resume` 在安全边界消费：运行中排队、空闲立即应用；取消为终态且不生成报告，暂停可续跑；HTTP / CLI / MCP / Web 四种入口共用同一 `ResearchProjectService` 语义。
+- 控制请求写入 append-only 事件账本（`control_requested` / `execution_paused` / `execution_cancelled` / `project_terminal`），`control.json` 仅作当前意图。
+- 盲测靶点排名协议完成可执行合成夹具 BM-14：freeze→score、摘要 SHA-256 冻结、结构篡改与 trap/safety 非补偿门禁在 CI 可自动验证；`benchmark/runner.py` 非 live 14 任务 / 30 断言全通过。
+- 研究项目契约升至 `3.1.0`，新增 `research_project_control` JSON Schema；schema 导出保留手工维护的 `context_relation_case.schema.json`。
+- 远程验收通过（2026-08-10）：全量 pytest 571 passed / 2 skipped / 3 warnings；round-4 聚焦测试 14 passed；benchmark 14 tasks / 30 assertions / score 1.0；schema 55 个生成 + 1 个手写（context_relation_case）= 56 个一致；repo policy OK。

@@ -1,8 +1,8 @@
 # Agent Benchmark Report
 
 - Gold set: `goldset_v2.jsonl` (live mode: False)
-- Tasks: 13/13 passed
-- Assertions: 29/29 passed (score 1.0)
+- Tasks: 14/14 passed
+- Assertions: 30/30 passed (score 1.0)
 
 | Task | Category | Result | Failed assertions |
 |---|---|---|---|
@@ -22,6 +22,7 @@
 | BM-L1 Live: Alzheimer disease full pipeline | live | SKIPPED (live) | - |
 | BM-L2 Live: lung adenocarcinoma with GEO omics | live | SKIPPED (live) | - |
 | BM-L3 Live: clinical trials evidence retrieved for LUAD oncogenes | live | SKIPPED (live) | - |
+| BM-14 Blind target-ranking protocol synthetic demo (freeze + score + non-compensating gates) | contract | PASS | - |
 
 ## Category scores
 
@@ -31,4 +32,4 @@
 | migration | 3 | 3 | 1.0 |
 | determinism | 3 | 3 | 1.0 |
 | robustness | 4 | 4 | 1.0 |
-| contract | 5 | 5 | 1.0 |
+| contract | 6 | 6 | 1.0 |

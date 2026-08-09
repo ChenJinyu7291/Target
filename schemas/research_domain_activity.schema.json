@@ -46,8 +46,8 @@
   "description": "Read-only projection of one authoritative child-workflow TraceEvent.\n\nThis record is an observability index. Scientific facts, numeric results and\nprovenance remain authoritative in the child EvidenceStore referenced by\n``child_run_id`` and ``source_trace_id``.",
   "properties": {
     "contract_version": {
-      "const": "3.0.0",
-      "default": "3.0.0",
+      "const": "3.1.0",
+      "default": "3.1.0",
       "title": "Contract Version",
       "type": "string"
     },

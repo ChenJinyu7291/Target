@@ -5,6 +5,7 @@
         "draft",
         "planned",
         "running",
+        "paused",
         "waiting_review",
         "completed",
         "completed_with_gaps",
@@ -19,8 +20,8 @@
   "additionalProperties": false,
   "properties": {
     "contract_version": {
-      "const": "3.0.0",
-      "default": "3.0.0",
+      "const": "3.1.0",
+      "default": "3.1.0",
       "title": "Contract Version",
       "type": "string"
     },

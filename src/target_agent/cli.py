@@ -194,6 +194,24 @@ def main() -> None:
     project_status.add_argument("--project-id", required=True)
     project_status.add_argument("--projects-dir", type=Path)
 
+    project_pause = sub.add_parser("project-pause", help="Pause a durable project at the next safe work-item boundary")
+    project_pause.add_argument("--project-id", required=True)
+    project_pause.add_argument("--actor", required=True)
+    project_pause.add_argument("--rationale", required=True)
+    project_pause.add_argument("--projects-dir", type=Path)
+
+    project_cancel = sub.add_parser("project-cancel", help="Cancel a durable project; no ranking/report/release is produced")
+    project_cancel.add_argument("--project-id", required=True)
+    project_cancel.add_argument("--actor", required=True)
+    project_cancel.add_argument("--rationale", required=True)
+    project_cancel.add_argument("--projects-dir", type=Path)
+
+    project_resume = sub.add_parser("project-resume", help="Resume a paused durable project and advance until the next stop")
+    project_resume.add_argument("--project-id", required=True)
+    project_resume.add_argument("--actor", required=True)
+    project_resume.add_argument("--rationale", required=True)
+    project_resume.add_argument("--projects-dir", type=Path)
+
     project_approve = sub.add_parser("project-approve", help="Accept a frozen plan, supervised work item, or release gate")
     project_approve.add_argument("--project-id", required=True)
     project_approve.add_argument("--target-id", required=True,
@@ -504,6 +522,33 @@ def main() -> None:
     elif args.command == "project-status":
         runtime = ResearchProjectRuntime(projects_dir=args.projects_dir, settings=settings)
         print(json.dumps(ResearchProjectService(runtime).snapshot(args.project_id), indent=2, ensure_ascii=False))
+    elif args.command == "project-pause":
+        runtime = ResearchProjectRuntime(projects_dir=args.projects_dir, settings=settings)
+        try:
+            result = ResearchProjectService(runtime).pause_project(
+                project_id=args.project_id, actor=args.actor, rationale=args.rationale,
+            )
+        except (ResearchProjectNotFound, ResearchDecisionError, ValueError) as exc:
+            _error_exit(exc)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    elif args.command == "project-cancel":
+        runtime = ResearchProjectRuntime(projects_dir=args.projects_dir, settings=settings)
+        try:
+            result = ResearchProjectService(runtime).cancel_project(
+                project_id=args.project_id, actor=args.actor, rationale=args.rationale,
+            )
+        except (ResearchProjectNotFound, ResearchDecisionError, ValueError) as exc:
+            _error_exit(exc)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    elif args.command == "project-resume":
+        runtime = ResearchProjectRuntime(projects_dir=args.projects_dir, settings=settings)
+        try:
+            result = ResearchProjectService(runtime).resume_project(
+                project_id=args.project_id, actor=args.actor, rationale=args.rationale,
+            )
+        except (ResearchProjectNotFound, ResearchDecisionError, ValueError) as exc:
+            _error_exit(exc)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
     elif args.command == "project-approve":
         runtime = ResearchProjectRuntime(projects_dir=args.projects_dir, settings=settings)
         result = ResearchProjectService(runtime).accept_checkpoint(

@@ -18,7 +18,7 @@ from .kernel import (
 )
 from .legacy import parse_task_spec
 from .research_contracts import (
-    RESEARCH_CONTRACT_VERSION, ProjectStatus, ResearchProjectSpec,
+    RESEARCH_CONTRACT_VERSION, ControlRequestKind, ProjectStatus, ResearchProjectSpec,
 )
 from .research_runtime import ResearchProjectRuntime
 from .research_service import ResearchDecisionError, ResearchProjectNotFound, ResearchProjectService
@@ -562,17 +562,65 @@ def create_app(
             "resume_queued": queued,
             "status_url": f"/api/projects/{project_id}",
         }), 202
+    def _control_payload() -> tuple[str, str]:
+        payload = request.get_json(silent=True) or {}
+        actor = str(payload.get("actor") or "researcher").strip()
+        rationale = str(payload.get("rationale") or "").strip()
+        return actor, rationale
+
+    @app.post("/api/projects/<project_id>/pause")
+    def pause_project(project_id: str):
+        project_id = _safe_project_id(project_id)
+        actor, rationale = _control_payload()
+        rationale = rationale or "Paused from the web workbench."
+        try:
+            result = research_service.pause_project(
+                project_id=project_id, actor=actor, rationale=rationale,
+            )
+        except ResearchProjectNotFound:
+            return jsonify({"error": "project not found"}), 404
+        except ResearchDecisionError as exc:
+            return jsonify({"error": str(exc)}), 409
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify(result), 202
+
+    @app.post("/api/projects/<project_id>/cancel")
+    def cancel_project(project_id: str):
+        project_id = _safe_project_id(project_id)
+        actor, rationale = _control_payload()
+        rationale = rationale or "Cancelled from the web workbench."
+        try:
+            result = research_service.cancel_project(
+                project_id=project_id, actor=actor, rationale=rationale,
+            )
+        except ResearchProjectNotFound:
+            return jsonify({"error": "project not found"}), 404
+        except ResearchDecisionError as exc:
+            return jsonify({"error": str(exc)}), 409
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify(result), 202
+
     @app.post("/api/projects/<project_id>/resume")
     def resume_project(project_id: str):
         project_id = _safe_project_id(project_id)
+        actor, rationale = _control_payload()
+        rationale = rationale or "Resumed from the web workbench."
         store = ResearchProjectStore(research_runtime.projects_dir, project_id)
-        spec = store.load_spec()
-        if spec is None:
+        if store.load_spec() is None:
             return jsonify({"error": "project not found"}), 404
+        pending = store.load_control()
+        if pending is not None and pending.request != ControlRequestKind.NONE:
+            return jsonify({
+                "error": f"a {pending.request.value} control request is pending; resolve it before resuming",
+            }), 409
 
         def resume_worker() -> None:
             try:
-                research_runtime.run(spec, resume=True)
+                research_service.resume_project(
+                    project_id=project_id, actor=actor, rationale=rationale,
+                )
             except Exception:
                 return
 
