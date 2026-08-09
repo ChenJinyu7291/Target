@@ -407,7 +407,7 @@ def test_metadata_audit_rejects_disease_mismatch_and_unverifiable_units(tmp_path
 
 
 def test_continuous_expression_rejects_raw_counts_and_marks_log_scale(tmp_path):
-    import pandas as pd
+    pd = pytest.importorskip("pandas")
 
     from target_agent.tools.omics import _prepare_continuous_expression
 
