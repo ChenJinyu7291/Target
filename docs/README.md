@@ -9,6 +9,7 @@
 | [ARCHITECTURE.md](ARCHITECTURE.md) | V3 总体架构、边界与执行链路 |
 | [PRODUCT_V3.md](PRODUCT_V3.md) | 当前产品边界、能力与路线图 |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | 本机 pip / Docker / Singularity 部署与密钥约定 |
+| [CLI_REFERENCE.md](CLI_REFERENCE.md) | 按任务分组的命令行操作参考 |
 | [DEMO_GUIDE.md](DEMO_GUIDE.md) | 演示路径、健康检查与现场恢复 |
 | [VALIDATION_REPORT.md](VALIDATION_REPORT.md) | 远程验收事实与基准报告 |
 | [DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md) | 每个模块的完成定义 |
