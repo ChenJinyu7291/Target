@@ -1,0 +1,1004 @@
+{
+  "contract_version": "1.0.0",
+  "benchmark_id": "target-dev-synthetic-library",
+  "split_id": "library-demo",
+  "adjudication": {
+    "status": "synthetic_fixture",
+    "reviewer_count": 2,
+    "reviewers_blinded": true,
+    "evidence_cutoff": "2026-08-14",
+    "source_snapshot_ids": [
+      "disease_library.yaml@1.0.0"
+    ]
+  },
+  "cases": [
+    {
+      "case_id": "lib-uc",
+      "judgment_pool_id": "pool-library-uc",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "TNF",
+          "grade": 3,
+          "source_ids": [
+            "library-uc-approved_drug"
+          ]
+        },
+        {
+          "gene": "IL23R",
+          "grade": 2,
+          "source_ids": [
+            "library-uc-gwas"
+          ]
+        },
+        {
+          "gene": "IL12B",
+          "grade": 3,
+          "source_ids": [
+            "library-uc-approved_drug"
+          ]
+        },
+        {
+          "gene": "JAK1",
+          "grade": 3,
+          "source_ids": [
+            "library-uc-approved_drug"
+          ]
+        },
+        {
+          "gene": "JAK3",
+          "grade": 3,
+          "source_ids": [
+            "library-uc-approved_drug"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_UC",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "TNF",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-uc-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-crohn",
+      "judgment_pool_id": "pool-library-crohn",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "NOD2",
+          "grade": 2,
+          "source_ids": [
+            "library-crohn-gwas"
+          ]
+        },
+        {
+          "gene": "TNF",
+          "grade": 3,
+          "source_ids": [
+            "library-crohn-approved_drug"
+          ]
+        },
+        {
+          "gene": "IL23R",
+          "grade": 2,
+          "source_ids": [
+            "library-crohn-gwas"
+          ]
+        },
+        {
+          "gene": "JAK1",
+          "grade": 3,
+          "source_ids": [
+            "library-crohn-approved_drug"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_CROHN",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "TNF",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-crohn-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-ra",
+      "judgment_pool_id": "pool-library-ra",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "TNF",
+          "grade": 3,
+          "source_ids": [
+            "library-ra-approved_drug"
+          ]
+        },
+        {
+          "gene": "IL6R",
+          "grade": 3,
+          "source_ids": [
+            "library-ra-approved_drug"
+          ]
+        },
+        {
+          "gene": "PTPN22",
+          "grade": 2,
+          "source_ids": [
+            "library-ra-gwas"
+          ]
+        },
+        {
+          "gene": "JAK3",
+          "grade": 3,
+          "source_ids": [
+            "library-ra-approved_drug"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_RA",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "TNF",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-ra-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-sle",
+      "judgment_pool_id": "pool-library-sle",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "IFNAR1",
+          "grade": 3,
+          "source_ids": [
+            "library-sle-approved_drug"
+          ]
+        },
+        {
+          "gene": "TNFSF13B",
+          "grade": 3,
+          "source_ids": [
+            "library-sle-approved_drug"
+          ]
+        },
+        {
+          "gene": "TYK2",
+          "grade": 1,
+          "source_ids": [
+            "library-sle-clinical_trial"
+          ]
+        },
+        {
+          "gene": "IRF5",
+          "grade": 2,
+          "source_ids": [
+            "library-sle-gwas"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_SLE",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "IFNAR1",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-sle-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-ms",
+      "judgment_pool_id": "pool-library-ms",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "CD20",
+          "grade": 3,
+          "source_ids": [
+            "library-ms-approved_drug"
+          ]
+        },
+        {
+          "gene": "S1PR1",
+          "grade": 3,
+          "source_ids": [
+            "library-ms-approved_drug"
+          ]
+        },
+        {
+          "gene": "IL2RA",
+          "grade": 2,
+          "source_ids": [
+            "library-ms-gwas"
+          ]
+        },
+        {
+          "gene": "ITGA4",
+          "grade": 3,
+          "source_ids": [
+            "library-ms-approved_drug"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_MS",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "CD20",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-ms-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-t1d",
+      "judgment_pool_id": "pool-library-t1d",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "INS",
+          "grade": 1,
+          "source_ids": [
+            "library-t1d-mechanistic"
+          ]
+        },
+        {
+          "gene": "PTPN22",
+          "grade": 2,
+          "source_ids": [
+            "library-t1d-gwas"
+          ]
+        },
+        {
+          "gene": "IL2RA",
+          "grade": 2,
+          "source_ids": [
+            "library-t1d-gwas"
+          ]
+        },
+        {
+          "gene": "CTLA4",
+          "grade": 2,
+          "source_ids": [
+            "library-t1d-gwas"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_T1D",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": []
+    },
+    {
+      "case_id": "lib-psoriasis",
+      "judgment_pool_id": "pool-library-psoriasis",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "IL17A",
+          "grade": 3,
+          "source_ids": [
+            "library-psoriasis-approved_drug"
+          ]
+        },
+        {
+          "gene": "IL23A",
+          "grade": 3,
+          "source_ids": [
+            "library-psoriasis-approved_drug"
+          ]
+        },
+        {
+          "gene": "TNF",
+          "grade": 3,
+          "source_ids": [
+            "library-psoriasis-approved_drug"
+          ]
+        },
+        {
+          "gene": "TYK2",
+          "grade": 3,
+          "source_ids": [
+            "library-psoriasis-approved_drug"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_PSORIASIS",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "IL17A",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-psoriasis-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-ad",
+      "judgment_pool_id": "pool-library-ad",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "APP",
+          "grade": 2,
+          "source_ids": [
+            "library-ad-mendelian"
+          ]
+        },
+        {
+          "gene": "APOE",
+          "grade": 2,
+          "source_ids": [
+            "library-ad-gwas"
+          ]
+        },
+        {
+          "gene": "PSEN1",
+          "grade": 2,
+          "source_ids": [
+            "library-ad-mendelian"
+          ]
+        },
+        {
+          "gene": "TREM2",
+          "grade": 2,
+          "source_ids": [
+            "library-ad-gwas"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_AD",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": []
+    },
+    {
+      "case_id": "lib-pd",
+      "judgment_pool_id": "pool-library-pd",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "SNCA",
+          "grade": 2,
+          "source_ids": [
+            "library-pd-mendelian"
+          ]
+        },
+        {
+          "gene": "LRRK2",
+          "grade": 2,
+          "source_ids": [
+            "library-pd-mendelian"
+          ]
+        },
+        {
+          "gene": "GBA",
+          "grade": 2,
+          "source_ids": [
+            "library-pd-gwas"
+          ]
+        },
+        {
+          "gene": "PRKN",
+          "grade": 2,
+          "source_ids": [
+            "library-pd-mendelian"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_PD",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": []
+    },
+    {
+      "case_id": "lib-als",
+      "judgment_pool_id": "pool-library-als",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "SOD1",
+          "grade": 3,
+          "source_ids": [
+            "library-als-approved_drug"
+          ]
+        },
+        {
+          "gene": "C9orf72",
+          "grade": 2,
+          "source_ids": [
+            "library-als-mendelian"
+          ]
+        },
+        {
+          "gene": "TARDBP",
+          "grade": 2,
+          "source_ids": [
+            "library-als-mendelian"
+          ]
+        },
+        {
+          "gene": "FUS",
+          "grade": 2,
+          "source_ids": [
+            "library-als-mendelian"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_ALS",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "SOD1",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-als-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-luad",
+      "judgment_pool_id": "pool-library-luad",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "EGFR",
+          "grade": 3,
+          "source_ids": [
+            "library-luad-approved_drug"
+          ]
+        },
+        {
+          "gene": "KRAS",
+          "grade": 3,
+          "source_ids": [
+            "library-luad-approved_drug"
+          ]
+        },
+        {
+          "gene": "ALK",
+          "grade": 3,
+          "source_ids": [
+            "library-luad-approved_drug"
+          ]
+        },
+        {
+          "gene": "ROS1",
+          "grade": 3,
+          "source_ids": [
+            "library-luad-approved_drug"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_LUAD",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "EGFR",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-luad-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-brca",
+      "judgment_pool_id": "pool-library-brca",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "ERBB2",
+          "grade": 3,
+          "source_ids": [
+            "library-brca-approved_drug"
+          ]
+        },
+        {
+          "gene": "ESR1",
+          "grade": 3,
+          "source_ids": [
+            "library-brca-approved_drug"
+          ]
+        },
+        {
+          "gene": "BRCA1",
+          "grade": 2,
+          "source_ids": [
+            "library-brca-mendelian"
+          ]
+        },
+        {
+          "gene": "PIK3CA",
+          "grade": 3,
+          "source_ids": [
+            "library-brca-approved_drug"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_BRCA",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "ERBB2",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-brca-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-crc",
+      "judgment_pool_id": "pool-library-crc",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "EGFR",
+          "grade": 3,
+          "source_ids": [
+            "library-crc-approved_drug"
+          ]
+        },
+        {
+          "gene": "VEGFA",
+          "grade": 3,
+          "source_ids": [
+            "library-crc-approved_drug"
+          ]
+        },
+        {
+          "gene": "APC",
+          "grade": 2,
+          "source_ids": [
+            "library-crc-mendelian"
+          ]
+        },
+        {
+          "gene": "BRAF",
+          "grade": 3,
+          "source_ids": [
+            "library-crc-approved_drug"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_CRC",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "EGFR",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-crc-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-melanoma",
+      "judgment_pool_id": "pool-library-melanoma",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "BRAF",
+          "grade": 3,
+          "source_ids": [
+            "library-melanoma-approved_drug"
+          ]
+        },
+        {
+          "gene": "PDCD1",
+          "grade": 3,
+          "source_ids": [
+            "library-melanoma-approved_drug"
+          ]
+        },
+        {
+          "gene": "CTLA4",
+          "grade": 3,
+          "source_ids": [
+            "library-melanoma-approved_drug"
+          ]
+        },
+        {
+          "gene": "MAP2K1",
+          "grade": 3,
+          "source_ids": [
+            "library-melanoma-approved_drug"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_MELANOMA",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "BRAF",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-melanoma-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-t2d",
+      "judgment_pool_id": "pool-library-t2d",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "SLC5A2",
+          "grade": 3,
+          "source_ids": [
+            "library-t2d-approved_drug"
+          ]
+        },
+        {
+          "gene": "GLP1R",
+          "grade": 3,
+          "source_ids": [
+            "library-t2d-approved_drug"
+          ]
+        },
+        {
+          "gene": "DPP4",
+          "grade": 3,
+          "source_ids": [
+            "library-t2d-approved_drug"
+          ]
+        },
+        {
+          "gene": "TCF7L2",
+          "grade": 2,
+          "source_ids": [
+            "library-t2d-gwas"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_T2D",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "SLC5A2",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-t2d-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-nash",
+      "judgment_pool_id": "pool-library-nash",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "THRB",
+          "grade": 3,
+          "source_ids": [
+            "library-nash-approved_drug"
+          ]
+        },
+        {
+          "gene": "NR1H4",
+          "grade": 1,
+          "source_ids": [
+            "library-nash-clinical_trial"
+          ]
+        },
+        {
+          "gene": "PNPLA3",
+          "grade": 2,
+          "source_ids": [
+            "library-nash-gwas"
+          ]
+        },
+        {
+          "gene": "GLP1R",
+          "grade": 1,
+          "source_ids": [
+            "library-nash-clinical_trial"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_NASH",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "THRB",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-nash-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-asthma",
+      "judgment_pool_id": "pool-library-asthma",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "IL5",
+          "grade": 3,
+          "source_ids": [
+            "library-asthma-approved_drug"
+          ]
+        },
+        {
+          "gene": "IL4R",
+          "grade": 3,
+          "source_ids": [
+            "library-asthma-approved_drug"
+          ]
+        },
+        {
+          "gene": "TSLP",
+          "grade": 3,
+          "source_ids": [
+            "library-asthma-approved_drug"
+          ]
+        },
+        {
+          "gene": "IL13",
+          "grade": 1,
+          "source_ids": [
+            "library-asthma-clinical_trial"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_ASTHMA",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "IL5",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-asthma-safety"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "lib-copd",
+      "judgment_pool_id": "pool-library-copd",
+      "unjudged_policy": "treat_as_nonrelevant",
+      "relevance": [
+        {
+          "gene": "PDE4",
+          "grade": 3,
+          "source_ids": [
+            "library-copd-approved_drug"
+          ]
+        },
+        {
+          "gene": "IL5",
+          "grade": 1,
+          "source_ids": [
+            "library-copd-clinical_trial"
+          ]
+        },
+        {
+          "gene": "IL4R",
+          "grade": 1,
+          "source_ids": [
+            "library-copd-clinical_trial"
+          ]
+        },
+        {
+          "gene": "CHRM3",
+          "grade": 3,
+          "source_ids": [
+            "library-copd-approved_drug"
+          ]
+        }
+      ],
+      "trap_targets": [
+        {
+          "gene": "TRAP_COPD",
+          "expected_behavior": "do_not_go"
+        }
+      ],
+      "safety_expectations": [
+        {
+          "gene": "PDE4",
+          "allowed_decisions": [
+            "CONDITIONAL_GO",
+            "NO_GO",
+            "INSUFFICIENT_EVIDENCE"
+          ],
+          "required_blocker_terms": [
+            "liability"
+          ],
+          "source_ids": [
+            "library-copd-safety"
+          ]
+        }
+      ]
+    }
+  ]
+}

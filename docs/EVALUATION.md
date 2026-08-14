@@ -95,6 +95,25 @@ run (`benchmark/results_ablation_blind/`):
 Synthetic labels only: these numbers measure mechanism behavior through ranking
 metrics, never biological performance.
 
+### Disease-library scale: `benchmark/ablation_blind_ranking_library.py`
+
+The same instrument over all 18 diseases of `configs/disease_library.yaml`, with
+synthetic labels derived from the curated evidence-graded `reference_targets`
+(the public library is train/dev sanity data per `benchmark/rubric.md`, so this
+remains a development measurement, not an external blind result). Latest run
+(`benchmark/results_ablation_blind_library/`):
+
+| Arm | Category | nDCG@K | MRR@K | Readout |
+|---|---|---:|---:|---|
+| baseline | — | 0.9996 | 1.0 | all gates pass across 18 diseases (trap rate 0, safety recall 1.0, unsafe GO 0) |
+| no_human_genetics | evidence_input | 0.9477 | 0.9167 | largest measured drop: removing the population-genetics anchor demotes GWAS-anchored targets |
+| no_mechanism_bonus | scoring | 0.9875 | 1.0 | small but real ranking contribution |
+| no_perturbation_layer | evidence_input | 0.9996 | 1.0 | no delta at library scale: measured perturbation sits only on multi-layer approved-drug targets here |
+| no_context_gate | safety_negative_control | 0.9994 | 1.0 | ranking ~unchanged, mismatched evidence ADMITTED (correct readout for this arm) |
+| no_reviewer_llm / no_planner_llm | model_component | 0.9996 | 1.0 | not measured by this in-process fixture |
+
+Reproduce: `python benchmark/ablation_blind_ranking_library.py`
+
 ## 5. Model-component ablations ("is it just the base model?")
 
 The ranking path is deterministic code, not base-model scoring. The

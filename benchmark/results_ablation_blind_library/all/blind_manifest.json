@@ -1,0 +1,179 @@
+{
+  "contract_version": "1.0.0",
+  "benchmark_id": "target-dev-synthetic-library",
+  "split_id": "library-demo",
+  "k": 10,
+  "require_expert_adjudication": false,
+  "thresholds": {
+    "min_ndcg_at_k": 0.6,
+    "min_recall_at_k": 0.7,
+    "min_mrr_at_k": 0.6,
+    "max_trap_case_rate": 0.0,
+    "min_safety_blocker_recall": 1.0,
+    "max_unsafe_go_rate": 0.0
+  },
+  "cases": [
+    {
+      "case_id": "lib-uc",
+      "disease_group_id": "MONDO:0005101",
+      "run_id": "run-all-lib-uc",
+      "task_sha256": "ec4270b7243861d3ede493f912ac246253573d89443350b9fe278311a379a8fb",
+      "ranking_sha256": "7397f76f1a8e86d1f41e208e07e4772b8bd8df0332689bb47257d9fbd398570d",
+      "status_sha256": "9d31d5f5aea1cae1b7ac1d7ec12fd859e0f25522aae661eca21885beba858ab0",
+      "bundle_sha256": "e6253da9d45966b66f551c3e6b8ac62a4f5e384eb534a2ea9a2b7c4e10d939c9"
+    },
+    {
+      "case_id": "lib-crohn",
+      "disease_group_id": "MONDO:0005011",
+      "run_id": "run-all-lib-crohn",
+      "task_sha256": "91f984d988b1b127e59d5c7189d46c2c9844e23421a341cac8610d92b64b8af9",
+      "ranking_sha256": "d3c88c78609e39f5b83ec73219b52255fda30ec76e7c54cd7be729cfde379760",
+      "status_sha256": "f98f60fe5cf02ad3d0b8892e8676ff3c97bf45e22c243d6a84ac8bea75d5a353",
+      "bundle_sha256": "fce34cbae104427626a908b5e43e2bf45106bfdd5da61c677392ea1c761795e7"
+    },
+    {
+      "case_id": "lib-ra",
+      "disease_group_id": "MONDO:0008383",
+      "run_id": "run-all-lib-ra",
+      "task_sha256": "cc3cb680e235ddd688602166f3d73e39fed3da2431b72287290efb10ab901742",
+      "ranking_sha256": "bd922ad63eba73071f50f8d64b3c3935c1eae9dc0fac9dc46cc2234b45b7bf92",
+      "status_sha256": "e05384317f0d48f216061cc5933f4b461fd15c61c0dd67bfeed0e314d9821484",
+      "bundle_sha256": "502716e0f299680dacf314444d742af074ce6f3d9c26280b7e32ccb0b7f38160"
+    },
+    {
+      "case_id": "lib-sle",
+      "disease_group_id": "MONDO:0007915",
+      "run_id": "run-all-lib-sle",
+      "task_sha256": "a0b427e9c3f4a1a532b7489c7f0940c091edb7e44e9a24ba5b389bd81276616f",
+      "ranking_sha256": "59e74dd347dab5ecfc769226991f7b8bc411b0178518143cee1141677114d582",
+      "status_sha256": "8882d9aaf86e124d191efe1c57d4a62c6512dca4c7ddfeff971b47dd60cafa1b",
+      "bundle_sha256": "a846d80c401f3b8bb21184961e2ae760820ad0350420a777d10cbf443cd80e73"
+    },
+    {
+      "case_id": "lib-ms",
+      "disease_group_id": "MONDO:0005301",
+      "run_id": "run-all-lib-ms",
+      "task_sha256": "8267e6a8fd80e811572767d8dda8bd720221bf81600bfb7e6706008ab3123c46",
+      "ranking_sha256": "b288605ca2920e801b59e3c15088783c0a51279e005c4f36647cbdb773309283",
+      "status_sha256": "1a0c7c1369e6d379753524a36f6caa51c73d0aac794ba1b80181045297edfd08",
+      "bundle_sha256": "708e6c36699202bcba9f27e7b16af915864171f10fcba9811da96d943109e431"
+    },
+    {
+      "case_id": "lib-t1d",
+      "disease_group_id": "MONDO:0005147",
+      "run_id": "run-all-lib-t1d",
+      "task_sha256": "f9af02ccaa5de7029732254ee493aa6fa9a60c429a5298ba2ad381be93dbbd97",
+      "ranking_sha256": "65fbc857eb9c7ab7333173da27c4c5d9c8afa94ed90012fbab6ca4a70012ee55",
+      "status_sha256": "8887feb182b08d16dc5567da2f36cb136c0b40954b54037f68493549e6ebf1c5",
+      "bundle_sha256": "af2c0b958e5a82c1d24256e6880a1412a806de908abd14746e27e18f5bd5393f"
+    },
+    {
+      "case_id": "lib-psoriasis",
+      "disease_group_id": "MONDO:0005083",
+      "run_id": "run-all-lib-psoriasis",
+      "task_sha256": "02fff5a92f8335296b0b393abcdb8fdc506115b9d65fc56d4d72a50bd1bbd053",
+      "ranking_sha256": "d0ce6f4c0f33d946a80b523e3520f03ee4255d53c8000688c77dbc0201bc4f77",
+      "status_sha256": "8f03ee811c90f33b7a80511e0b2cb7c553e03428dbecf2f858606ce21979a88b",
+      "bundle_sha256": "ec4a87e8c87a65acb4a3e61feccd49142e3ec5ab05fdcc5d16044b437911b6e2"
+    },
+    {
+      "case_id": "lib-ad",
+      "disease_group_id": "MONDO:0004975",
+      "run_id": "run-all-lib-ad",
+      "task_sha256": "1452fb54d696a92d9a7c1229228ecb922fb644f2bfed56bf280eea134a6ca696",
+      "ranking_sha256": "0a9f2910fd2002026fee5665be5fe3747f35ba4376a3a1231b02b79877e660de",
+      "status_sha256": "32a024d3feda8cb17b5981c447ccab9daf349b784a04a6134e13b9a1f2d23e55",
+      "bundle_sha256": "3f5e7386902493a0bfefef79cdf0613cea21ccc740326ed0137c5b5b96ca9c20"
+    },
+    {
+      "case_id": "lib-pd",
+      "disease_group_id": "MONDO:0005180",
+      "run_id": "run-all-lib-pd",
+      "task_sha256": "b7ea35eb4a87b1b3aed0593cdba229225b78f36c601765334ccbcf4b9ab9efd2",
+      "ranking_sha256": "754b5dd7a357dcba1733252274e066614795b011c6e4e83b1d772518df26b31a",
+      "status_sha256": "5e92dc8834ad4365993d4c82466ce05eb84321a3b8eeaad0d92ff6694fa8d423",
+      "bundle_sha256": "aaed7fd4532ae8837714dab9a3f61cdca3533c08f232eb75cdd13b26d3a6cea7"
+    },
+    {
+      "case_id": "lib-als",
+      "disease_group_id": "MONDO:0004976",
+      "run_id": "run-all-lib-als",
+      "task_sha256": "69d95e1cbd0475edc063bba0248f7bef92834a0e57c3f5b70b203a49c0855ed5",
+      "ranking_sha256": "df9f127bf49eeb77fdd35bc4ce7cc6360514118d9ee55fb8959dfa98339d6184",
+      "status_sha256": "fb244588475c3e1701bef48e5d62da559332c67390aa7797c18f04114259e3fb",
+      "bundle_sha256": "cceb67310dc1571140823b2dfa1ba8e0a8fd6e7c20e85b2addadee836ebec8d2"
+    },
+    {
+      "case_id": "lib-luad",
+      "disease_group_id": "MONDO:0005061",
+      "run_id": "run-all-lib-luad",
+      "task_sha256": "97dfc506aeb64885228549f5ec87a9220accf6f79bae80f282e9031d86181862",
+      "ranking_sha256": "c1d41a6911038a37217bff6b55743bb66046df3bb1e7492d9f0e12542a8765bb",
+      "status_sha256": "692089af9d212f93b85210a56b2289e52d6f07863ac779350eae017e338abbe2",
+      "bundle_sha256": "98fa1b5c0ee7064ec49ab40246e5cdff383774d780d0191ca9fabfd7e775fb28"
+    },
+    {
+      "case_id": "lib-brca",
+      "disease_group_id": "MONDO:0004989",
+      "run_id": "run-all-lib-brca",
+      "task_sha256": "6cd6adc30a18daf146cdba21e650e12b54229bd73697904b547db5aaf4e0c799",
+      "ranking_sha256": "103d2ebd6b8c04fc8b9b469696da246be2f12966bfefb2dcdd45a017dd0b7d2c",
+      "status_sha256": "c422214d2297596fd39f1ec5b2a2a1a6100f905cb95d57a0987115434b481ac9",
+      "bundle_sha256": "9b5ee0211a7bea9a7ea0eb96a7f8f67c3535797782cab200db4108bc94f0c55a"
+    },
+    {
+      "case_id": "lib-crc",
+      "disease_group_id": "MONDO:0005575",
+      "run_id": "run-all-lib-crc",
+      "task_sha256": "b44b5a31c8518233daf22f322b1e18feb19a3c430fa169f714ec5ca253380b11",
+      "ranking_sha256": "e479c879763b7a66f2b22e89d4d03abb095f19ee45394a71526ac735d13ef7a3",
+      "status_sha256": "9c1158d10b858557b96563e4f4e6fb3b282c3a544ce6578f32c13725406c0b43",
+      "bundle_sha256": "7e0602b953aebd71f1f8aef994ed302dd0d1ffccafbf241957b92e6312ea355d"
+    },
+    {
+      "case_id": "lib-melanoma",
+      "disease_group_id": "MONDO:0005105",
+      "run_id": "run-all-lib-melanoma",
+      "task_sha256": "f4b0e3368819ec3c16e2e66ec5512b0d64ecf743daf5dbcfc65e03f81dd269cc",
+      "ranking_sha256": "a89cef589632379fc9ac0a98384daa6f8bd0d1e176d3c7f735bbb6e893454bbd",
+      "status_sha256": "8c4f380c6c8560140c65acba7c581f50df680469b1cab0943f9e7597c207b803",
+      "bundle_sha256": "5fb150338a2dc22209008d362ce82d7406112d87c01d239ad290fb99df58d649"
+    },
+    {
+      "case_id": "lib-t2d",
+      "disease_group_id": "MONDO:0005148",
+      "run_id": "run-all-lib-t2d",
+      "task_sha256": "7f4cbd8c955e091d316409f74b83a773e35caa9648271f911156c36bd71d78f1",
+      "ranking_sha256": "18de5acd0c47f2a1a309302abefe4fa18ff5c6b708cfe9366e9ad75923c5955d",
+      "status_sha256": "a7bb5da5fc4683cb07046ba4c17f542d0ae42fc431b5d4f2f8ed0225719ea606",
+      "bundle_sha256": "f8984475538c98d22a61567a5dbf4fd53f97af6484064959090d21c5839457c6"
+    },
+    {
+      "case_id": "lib-nash",
+      "disease_group_id": "MONDO:0007027",
+      "run_id": "run-all-lib-nash",
+      "task_sha256": "8497f21496b844993a480d738615636f3a0166bcbf70d793573f715cf711f8ff",
+      "ranking_sha256": "b8f01d6dd5d8a95f2d36ab96ab7e35c141da09f4aaa7ced694fa89a215a53b71",
+      "status_sha256": "a9c3f0b766a75d3cd3b03fa14ebed18d948a267afa4542ab13010a6e64b1e2b0",
+      "bundle_sha256": "7afd8c4827c689a41586ec70755c891e7cef7fd24d3fde69a23d2ee8bd03f7f2"
+    },
+    {
+      "case_id": "lib-asthma",
+      "disease_group_id": "MONDO:0004979",
+      "run_id": "run-all-lib-asthma",
+      "task_sha256": "a7f668aadf3f4387c373c58cc7416b447d2e4df9edd3dda82c2479b4847c7ffb",
+      "ranking_sha256": "9f4444c4c0e893c1e9be3d24757fcf632e34a0d346cdcd5ade1c917912841481",
+      "status_sha256": "cffdcdee4b9d0b019110b5682ad337e0d69826e6bf4ca41a60505d9683b797ef",
+      "bundle_sha256": "379b61097a70092c1dfc9902d2d07e53edae181c523d868b05ef67f2e199933c"
+    },
+    {
+      "case_id": "lib-copd",
+      "disease_group_id": "MONDO:0005002",
+      "run_id": "run-all-lib-copd",
+      "task_sha256": "f7e2fd2e787fb8ea44b396a12ea8a61e186d32635d335c8946dc8ab1bf047943",
+      "ranking_sha256": "3cfe5e1b108ab3db63ca1cdab3684ee5b904d5d63e9e6d057b14cd19b96a9d5b",
+      "status_sha256": "d00e5a5d13182332544993c48c85d6304ffe317fc2572b6fc3d2e89f6acba1ad",
+      "bundle_sha256": "91748d8c73fc7d890553c9138caa6ff2aa14664d293d6e8bd68825c9409fb60a"
+    }
+  ]
+}

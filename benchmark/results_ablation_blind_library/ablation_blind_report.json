@@ -1,0 +1,146 @@
+{
+  "fixture": "synthetic labels derived from the public disease library (train/dev sanity data per benchmark/rubric.md); NOT an external blind biological result",
+  "diseases": 18,
+  "method": "Each arm re-ranks identical synthetic per-disease evidence with the real rank_targets scorer under an evaluation-only AblationConfig; artifacts are digest-frozen per arm and scored with the BM-14 blind-ranking protocol.",
+  "rows": [
+    {
+      "arm": "baseline",
+      "category": "baseline",
+      "ablations": "none",
+      "disease_macro_ndcg_at_k": 0.999643,
+      "disease_macro_recall_at_k": 1.0,
+      "disease_macro_mrr_at_k": 1.0,
+      "trap_case_rate": 0.0,
+      "disease_macro_safety_blocker_recall": 1.0,
+      "disease_macro_unsafe_go_rate": 0.0,
+      "gates_passed": true,
+      "mismatched_evidence_admitted": false,
+      "manifest_sha256": "ba91faa2128c004b6f3abff5f3b2f479efc693b02f623d315a849adf36c3cce6",
+      "delta_ndcg_vs_baseline": 0.0
+    },
+    {
+      "arm": "no_context_gate",
+      "category": "safety_negative_control",
+      "ablations": [
+        "no_context_gate"
+      ],
+      "disease_macro_ndcg_at_k": 0.999394,
+      "disease_macro_recall_at_k": 1.0,
+      "disease_macro_mrr_at_k": 1.0,
+      "trap_case_rate": 0.0,
+      "disease_macro_safety_blocker_recall": 1.0,
+      "disease_macro_unsafe_go_rate": 0.0,
+      "gates_passed": true,
+      "mismatched_evidence_admitted": true,
+      "manifest_sha256": "f2cd0f16f2695793ccc6bffaeb47d87545917e68987c812bd8350618d9bdb822",
+      "delta_ndcg_vs_baseline": 0.000249
+    },
+    {
+      "arm": "no_human_genetics",
+      "category": "evidence_input",
+      "ablations": [
+        "no_human_genetics"
+      ],
+      "disease_macro_ndcg_at_k": 0.94768,
+      "disease_macro_recall_at_k": 1.0,
+      "disease_macro_mrr_at_k": 0.916667,
+      "trap_case_rate": 0.0,
+      "disease_macro_safety_blocker_recall": 1.0,
+      "disease_macro_unsafe_go_rate": 0.0,
+      "gates_passed": true,
+      "mismatched_evidence_admitted": false,
+      "manifest_sha256": "fbbb76f305924797e28f5364f992e696dead6adc9a4824b456d5107c77693beb",
+      "delta_ndcg_vs_baseline": 0.051963
+    },
+    {
+      "arm": "no_mechanism_bonus",
+      "category": "scoring",
+      "ablations": [
+        "no_mechanism_bonus"
+      ],
+      "disease_macro_ndcg_at_k": 0.987513,
+      "disease_macro_recall_at_k": 1.0,
+      "disease_macro_mrr_at_k": 1.0,
+      "trap_case_rate": 0.0,
+      "disease_macro_safety_blocker_recall": 1.0,
+      "disease_macro_unsafe_go_rate": 0.0,
+      "gates_passed": true,
+      "mismatched_evidence_admitted": false,
+      "manifest_sha256": "09275e7cab5e5101b57daa42769de7a772dad3026c27454c2657c2b5dde2576e",
+      "delta_ndcg_vs_baseline": 0.01213
+    },
+    {
+      "arm": "no_perturbation_layer",
+      "category": "evidence_input",
+      "ablations": [
+        "no_perturbation_layer"
+      ],
+      "disease_macro_ndcg_at_k": 0.999643,
+      "disease_macro_recall_at_k": 1.0,
+      "disease_macro_mrr_at_k": 1.0,
+      "trap_case_rate": 0.0,
+      "disease_macro_safety_blocker_recall": 1.0,
+      "disease_macro_unsafe_go_rate": 0.0,
+      "gates_passed": true,
+      "mismatched_evidence_admitted": false,
+      "manifest_sha256": "6887e0c73fa8be4a257e4c77b3798d26daeaff7a26742b7cb8db807595075cdd",
+      "delta_ndcg_vs_baseline": 0.0
+    },
+    {
+      "arm": "no_planner_llm",
+      "category": "model_component",
+      "ablations": [
+        "no_planner_llm"
+      ],
+      "disease_macro_ndcg_at_k": 0.999643,
+      "disease_macro_recall_at_k": 1.0,
+      "disease_macro_mrr_at_k": 1.0,
+      "trap_case_rate": 0.0,
+      "disease_macro_safety_blocker_recall": 1.0,
+      "disease_macro_unsafe_go_rate": 0.0,
+      "gates_passed": true,
+      "mismatched_evidence_admitted": false,
+      "manifest_sha256": "e4d253e2eb9fd61d561e9e3864d47df28eea1d98a6b688d510ac9af5d6e8f1b0",
+      "delta_ndcg_vs_baseline": 0.0
+    },
+    {
+      "arm": "no_reviewer_llm",
+      "category": "model_component",
+      "ablations": [
+        "no_reviewer_llm"
+      ],
+      "disease_macro_ndcg_at_k": 0.999643,
+      "disease_macro_recall_at_k": 1.0,
+      "disease_macro_mrr_at_k": 1.0,
+      "trap_case_rate": 0.0,
+      "disease_macro_safety_blocker_recall": 1.0,
+      "disease_macro_unsafe_go_rate": 0.0,
+      "gates_passed": true,
+      "mismatched_evidence_admitted": false,
+      "manifest_sha256": "915344dc84b5e60c8b80c529594a87ce49aa94051d04febc23d08cf93ac7407c",
+      "delta_ndcg_vs_baseline": 0.0
+    },
+    {
+      "arm": "all",
+      "category": "all_combined",
+      "ablations": [
+        "no_context_gate",
+        "no_human_genetics",
+        "no_mechanism_bonus",
+        "no_perturbation_layer",
+        "no_planner_llm",
+        "no_reviewer_llm"
+      ],
+      "disease_macro_ndcg_at_k": 0.940015,
+      "disease_macro_recall_at_k": 1.0,
+      "disease_macro_mrr_at_k": 0.916667,
+      "trap_case_rate": 0.0,
+      "disease_macro_safety_blocker_recall": 1.0,
+      "disease_macro_unsafe_go_rate": 0.0,
+      "gates_passed": true,
+      "mismatched_evidence_admitted": true,
+      "manifest_sha256": "5b6d2b89901acff0db34239018f367efdb6208baf1c155ca571555774a7c1945",
+      "delta_ndcg_vs_baseline": 0.059628
+    }
+  ]
+}
