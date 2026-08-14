@@ -5,6 +5,7 @@ import json
 
 from pydantic import ValidationError
 
+from .ablations import from_env as ablation_switches
 from .contracts import ExecutionPlan, PlanStep, TaskSpec
 from .llm import LLMUnavailable, StepClient
 from .paper_strategy import PatternStore, PlannerFewShotBuilder, infer_data_availability
@@ -254,6 +255,8 @@ class Planner:
     def create_plan(self, task: TaskSpec) -> ExecutionPlan:
         self.last_pattern_hints = []
         self.last_paper_evidence = []
+        if "no_planner_llm" in ablation_switches():
+            return self.deterministic(task, "ablated no_planner_llm")
         if not self.client:
             return self.deterministic(task, "Step API not configured")
         template = self.deterministic(task)

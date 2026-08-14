@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .ablations import AblationConfig
 from .contracts import (
     ClaimClass, EvidenceItem, ReviewerFinding, ScoreBreakdown, Stance,
     TargetGeneticEvidenceSummary, TaskContext, TerminalStatus, ToolResult,
@@ -82,7 +83,14 @@ def rank_targets(
     minimum_coloc_pp4: float = 0.8,
     task_context: TaskContext | None = None,
     terminal_status: TerminalStatus | None = None,
+    ablations: AblationConfig | frozenset[str] | None = None,
 ) -> list[RankedTarget]:
+    """Transparent six-dimensional ranking.
+
+    `ablations` (see ablations.py) removes individual mechanisms for evaluation;
+    the default (empty AblationConfig) travels the exact production path.
+    """
+    ablations = AblationConfig.coerce(ablations)
     results_by_id = {result.tool_run_id: result for result in results}
 
     def tool_lineage(tool_run_id: str) -> set[str]:
@@ -117,7 +125,7 @@ def rank_targets(
         items = by_gene[gene]
         scored = [(evidence_context_score(item, task_context), item) for item in items]
         context_by_id = {item.evidence_id: score for score, item in scored}
-        formal = [item for score, item in scored if score.score >= 0.5]
+        formal = items if "no_context_gate" in ablations else [item for score, item in scored if score.score >= 0.5]
         genetics = 0.0
         omics = 0.0
         perturb = 0.0
@@ -136,7 +144,8 @@ def rank_targets(
             context = context_by_id[item.evidence_id].score
             genetic = item.genetic_evidence
             if (
-                genetic is not None
+                "no_human_genetics" not in ablations
+                and genetic is not None
                 and genetic.formal_score_eligible
                 and genetic.analysis_level == "colocalization_supported"
                 and genetic.evidence_type in {"colocalization", "locus_to_gene"}
@@ -167,11 +176,12 @@ def rank_targets(
                 omics = max(omics, WEIGHTS["disease_omics"] * normalized * context)
             if "omics_strength" in item.effect:
                 omics = max(omics, WEIGHTS["disease_omics"] * float(item.effect["omics_strength"]) * context)
-            if item.claim_class == ClaimClass.OBSERVED and "disease_alignment" in item.effect:
-                alignment = abs(float(item.effect["disease_alignment"]))
-                perturb = max(perturb, (8.0 + min(12.0, alignment / 0.1 * 12.0)) * context)
-            if item.claim_class == ClaimClass.PREDICTED:
-                perturb = max(perturb, min(WEIGHTS["perturbation"] / 2.0, 10.0 * context))
+            if "no_perturbation_layer" not in ablations:
+                if item.claim_class == ClaimClass.OBSERVED and "disease_alignment" in item.effect:
+                    alignment = abs(float(item.effect["disease_alignment"]))
+                    perturb = max(perturb, (8.0 + min(12.0, alignment / 0.1 * 12.0)) * context)
+                if item.claim_class == ClaimClass.PREDICTED:
+                    perturb = max(perturb, min(WEIGHTS["perturbation"] / 2.0, 10.0 * context))
 
         if independent_genetic_context:
             independent_loci = len(independent_genetic_context)
@@ -182,13 +192,14 @@ def rank_targets(
         has_omics = any("legacy_disease_strength_0_60" in item.effect or "omics_strength" in item.effect for item in formal)
         has_observed_perturb = any(item.claim_class == ClaimClass.OBSERVED and "disease_alignment" in item.effect for item in formal)
         has_literature = any(_directional_supported_literature(item) for item in formal)
-        if has_omics and has_observed_perturb:
-            mechanism += 8.0
-        if has_literature:
-            mechanism += 4.0
-        if genetics > 0 and has_omics:
-            mechanism += 3.0
-        mechanism = min(WEIGHTS["mechanism"], mechanism)
+        if "no_mechanism_bonus" not in ablations:
+            if has_omics and has_observed_perturb:
+                mechanism += 8.0
+            if has_literature:
+                mechanism += 4.0
+            if genetics > 0 and has_omics:
+                mechanism += 3.0
+            mechanism = min(WEIGHTS["mechanism"], mechanism)
         if matched_drugs:
             max_phase = max(_phase_value(drug.get("phase")) for drug in matched_drugs)
             druggability = min(10.0, 4.0 + max_phase * 1.5)
@@ -259,7 +270,7 @@ def rank_targets(
             total=_clamp(genetics + omics + perturb + mechanism + druggability + safety, 100),
         )
         independent = sum([has_strict_genetics, has_omics, has_observed_perturb, has_literature, bool(matched_drugs)])
-        gate = has_strict_genetics or has_observed_perturb
+        gate = has_strict_genetics or (has_observed_perturb and "no_perturbation_layer" not in ablations)
         if safety_events or strong_opposing:
             decision = "NO_GO"
         elif blockers:

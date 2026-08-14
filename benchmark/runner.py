@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 from pydantic import ValidationError  # noqa: E402
 
+from target_agent.ablations import parse as parse_ablations  # noqa: E402
 from target_agent.contracts import ExecutionPlan, PlanStep, TaskSpec  # noqa: E402
 from target_agent.legacy import parse_task_spec  # noqa: E402
 from target_agent.planner import Planner  # noqa: E402
@@ -426,7 +427,17 @@ def main() -> int:
                         help="live mode only: share one cache directory across entries so repeated "
                              "contexts (e.g. disease-library buckets) reuse downloads")
     parser.add_argument("--keep-runs", action="store_true", help="keep run directories for inspection")
+    parser.add_argument("--ablate", type=str, default="",
+                        help="comma-separated mechanism ablations (see src/target_agent/ablations.py), "
+                             "e.g. --ablate no_mechanism_bonus,no_planner_llm; evaluation-only, the "
+                             "resulting score delta is descriptive — independent-contribution claims "
+                             "require the blind-ranking protocol (benchmark/rubric.md)")
     args = parser.parse_args()
+
+    if args.ablate:
+        import os
+        os.environ["TARGET_AGENT_EVALUATION_MODE"] = "1"  # ablations are evaluation-only
+        os.environ["TARGET_AGENT_ABLATIONS"] = ",".join(sorted(parse_ablations(args.ablate)))
 
     entries = [json.loads(line) for line in args.goldset.read_text(encoding="utf-8").splitlines() if line.strip()]
     reports = []
@@ -464,6 +475,7 @@ def main() -> int:
         bucket["passed"] += sum(1 for a in report["results"] if a["passed"])
     summary = {
         "goldset": public_path_label(args.goldset), "live": args.live,
+        "ablations": sorted(parse_ablations(args.ablate)),
         "tasks": len(executed), "tasks_passed": sum(1 for r in executed if r["passed"]),
         "assertions": total, "assertions_passed": passed,
         "score": round(passed / total, 4) if total else None,
@@ -475,6 +487,7 @@ def main() -> int:
 
     lines = ["# Agent Benchmark Report", "",
              f"- Gold set: `{args.goldset.name}` (live mode: {args.live})",
+             f"- Ablations: {args.ablate or 'none (full mechanism stack)'}",
              f"- Tasks: {summary['tasks_passed']}/{summary['tasks']} passed",
              f"- Assertions: {summary['assertions_passed']}/{summary['assertions']} passed"
              f" (score {summary['score']})", "",

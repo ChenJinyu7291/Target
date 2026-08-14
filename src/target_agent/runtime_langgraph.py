@@ -35,6 +35,8 @@ from .contracts import (
 
 
 from .graphs import build_mechanistic_graph
+from .ablations import from_env as ablation_switches
+from .evidence_tiers import concordance_matrix, format_report_section, load_tiers
 from .llm import StepClient
 from .legacy import migrate_current_contract
 from .paper_strategy import pattern_store_from_path
@@ -510,6 +512,7 @@ class LangGraphRuntime:
                 minimum_coloc_pp4=task.constraints.genetics.minimum_coloc_pp4,
                 task_context=task.context,
                 terminal_status=status,
+                ablations=ablation_switches(),
             )
             ranked_payload = self._serialize_ranked(ranked, task.constraints.max_ranked_targets)
             cards = build_cards(task, ranked, terminal_status=status)
@@ -543,8 +546,14 @@ class LangGraphRuntime:
         task, store, status = state["task"], state["store"], state["status"]
         results = state["results"]
         if task.task_type in {"disease_to_target", "gwas_locus_to_target"}:
+            policy = load_tiers()
+            tier_genes = [row["gene"] for row in state["ranked_payload"]]
+            tier_matrix = concordance_matrix(tier_genes, state["evidence"], results, policy)
+            if tier_matrix:
+                store.save_json("evidence_tier_concordance.json", tier_matrix)
             report_payload, markdown = build_disease_report(
-                task, status, state["ranked_payload"], state["cards"], state["findings"], results)
+                task, status, state["ranked_payload"], state["cards"], state["findings"], results,
+                tier_section=format_report_section(tier_matrix, tier_genes, policy) if tier_matrix else None)
         else:
             mch_result = next((result for result in results if result.tool_name == "mch_causal_gold"), None)
             report_payload, markdown = build_mch_report(task, status, mch_result, state["findings"])

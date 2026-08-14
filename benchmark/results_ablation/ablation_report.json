@@ -1,0 +1,121 @@
+{
+  "goldset": "goldset_v2.jsonl",
+  "method": "Each row re-runs the identical goldset with the named mechanism(s) disabled (evaluation-only AblationConfig). delta_vs_baseline is a DESCRIPTIVE assertion-score delta on this goldset, grouped by ablation category; it does not by itself establish an independent contribution - that claim requires the blind-ranking protocol (benchmark/rubric.md, BM-14 scorer) with nDCG/Recall@K/MRR/blocker/safety metrics on fixed cases, candidates and labels. The base model is identical across rows.",
+  "rows": [
+    {
+      "set": "baseline",
+      "category": "baseline",
+      "ablations": "none",
+      "score": 1.0,
+      "assertions": 30,
+      "assertions_passed": 30,
+      "tasks_passed": 14,
+      "tasks": 14,
+      "failed_tasks": [],
+      "delta_vs_baseline": 0.0
+    },
+    {
+      "set": "no_context_gate",
+      "category": "safety_negative_control",
+      "ablations": [
+        "no_context_gate"
+      ],
+      "score": 1.0,
+      "assertions": 30,
+      "assertions_passed": 30,
+      "tasks_passed": 14,
+      "tasks": 14,
+      "failed_tasks": [],
+      "delta_vs_baseline": 0.0
+    },
+    {
+      "set": "no_human_genetics",
+      "category": "evidence_input",
+      "ablations": [
+        "no_human_genetics"
+      ],
+      "score": 1.0,
+      "assertions": 30,
+      "assertions_passed": 30,
+      "tasks_passed": 14,
+      "tasks": 14,
+      "failed_tasks": [],
+      "delta_vs_baseline": 0.0
+    },
+    {
+      "set": "no_mechanism_bonus",
+      "category": "scoring",
+      "ablations": [
+        "no_mechanism_bonus"
+      ],
+      "score": 1.0,
+      "assertions": 30,
+      "assertions_passed": 30,
+      "tasks_passed": 14,
+      "tasks": 14,
+      "failed_tasks": [],
+      "delta_vs_baseline": 0.0
+    },
+    {
+      "set": "no_perturbation_layer",
+      "category": "evidence_input",
+      "ablations": [
+        "no_perturbation_layer"
+      ],
+      "score": 1.0,
+      "assertions": 30,
+      "assertions_passed": 30,
+      "tasks_passed": 14,
+      "tasks": 14,
+      "failed_tasks": [],
+      "delta_vs_baseline": 0.0
+    },
+    {
+      "set": "no_planner_llm",
+      "category": "model_component",
+      "ablations": [
+        "no_planner_llm"
+      ],
+      "score": 1.0,
+      "assertions": 30,
+      "assertions_passed": 30,
+      "tasks_passed": 14,
+      "tasks": 14,
+      "failed_tasks": [],
+      "delta_vs_baseline": 0.0
+    },
+    {
+      "set": "no_reviewer_llm",
+      "category": "model_component",
+      "ablations": [
+        "no_reviewer_llm"
+      ],
+      "score": 1.0,
+      "assertions": 30,
+      "assertions_passed": 30,
+      "tasks_passed": 14,
+      "tasks": 14,
+      "failed_tasks": [],
+      "delta_vs_baseline": 0.0
+    },
+    {
+      "set": "all",
+      "category": "all_combined",
+      "ablations": [
+        "no_context_gate",
+        "no_human_genetics",
+        "no_mechanism_bonus",
+        "no_perturbation_layer",
+        "no_planner_llm",
+        "no_reviewer_llm"
+      ],
+      "score": 1.0,
+      "assertions": 30,
+      "assertions_passed": 30,
+      "tasks_passed": 14,
+      "tasks": 14,
+      "failed_tasks": [],
+      "delta_vs_baseline": 0.0
+    }
+  ]
+}

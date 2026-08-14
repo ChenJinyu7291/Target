@@ -1,0 +1,453 @@
+{
+  "summary": {
+    "goldset": "benchmark/goldset_v2.jsonl",
+    "live": false,
+    "ablations": [],
+    "tasks": 14,
+    "tasks_passed": 14,
+    "assertions": 30,
+    "assertions_passed": 30,
+    "score": 1.0,
+    "categories": {
+      "main_chain": {
+        "assertions": 14,
+        "passed": 14,
+        "score": 1.0
+      },
+      "migration": {
+        "assertions": 3,
+        "passed": 3,
+        "score": 1.0
+      },
+      "determinism": {
+        "assertions": 3,
+        "passed": 3,
+        "score": 1.0
+      },
+      "robustness": {
+        "assertions": 4,
+        "passed": 4,
+        "score": 1.0
+      },
+      "contract": {
+        "assertions": 6,
+        "passed": 6,
+        "score": 1.0
+      }
+    }
+  },
+  "tasks": [
+    {
+      "id": "BM-01",
+      "title": "UC main chain completes with expected ranking",
+      "category": "main_chain",
+      "mode": "fake",
+      "results": [
+        {
+          "assertion": {
+            "type": "terminal_status",
+            "equals": "completed"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "ranking_contains",
+            "gene": "IL2"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "ranking_length",
+            "equals": 10
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "cards_length",
+            "equals": 5
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "trace_contains",
+            "event_type": "plan",
+            "state": "planner"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "trace_contains",
+            "event_type": "review",
+            "state": "reviewer"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "trace_contains",
+            "event_type": "ranking",
+            "state": "ranking"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "trace_contains",
+            "event_type": "report",
+            "state": "report"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "report.md"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "case_record.json"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "evidence_provenance"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.04
+    },
+    {
+      "id": "BM-02",
+      "title": "Legacy engine produces identical observable output",
+      "category": "migration",
+      "mode": "fake",
+      "results": [
+        {
+          "assertion": {
+            "type": "terminal_status",
+            "equals": "completed"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "ranking_contains",
+            "gene": "IL2"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "parity"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.04
+    },
+    {
+      "id": "BM-03",
+      "title": "Repeated runs are deterministic",
+      "category": "determinism",
+      "mode": "fake",
+      "results": [
+        {
+          "assertion": {
+            "type": "deterministic",
+            "runs": 3
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.06
+    },
+    {
+      "id": "BM-04",
+      "title": "Terminal resume is idempotent",
+      "category": "determinism",
+      "mode": "fake",
+      "results": [
+        {
+          "assertion": {
+            "type": "resume_idempotent"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.03
+    },
+    {
+      "id": "BM-05",
+      "title": "Mid-pipeline crash resumes to completion",
+      "category": "determinism",
+      "mode": "fake",
+      "results": [
+        {
+          "assertion": {
+            "type": "resume_completes",
+            "terminal_status": "completed"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.04
+    },
+    {
+      "id": "BM-06",
+      "title": "Tool-call budget degrades gracefully",
+      "category": "robustness",
+      "mode": "fake",
+      "results": [
+        {
+          "assertion": {
+            "type": "trace_contains",
+            "event_type": "degradation",
+            "state": "tool_execution"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "terminal_status_in",
+            "values": [
+              "completed_with_gaps"
+            ]
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.03
+    },
+    {
+      "id": "BM-07",
+      "title": "MCH causal gold validates the exact trait",
+      "category": "main_chain",
+      "mode": "fake",
+      "results": [
+        {
+          "assertion": {
+            "type": "tool_status",
+            "tool": "mch_causal_gold",
+            "status": "success"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "file_exists",
+            "path": "causal_graph.json"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "evidence_provenance"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.02
+    },
+    {
+      "id": "BM-08",
+      "title": "Out-of-scope trait is refused, not fabricated",
+      "category": "robustness",
+      "mode": "fake",
+      "results": [
+        {
+          "assertion": {
+            "type": "tool_status",
+            "tool": "mch_causal_gold",
+            "status": "out_of_scope"
+          },
+          "passed": true,
+          "failure": null
+        },
+        {
+          "assertion": {
+            "type": "terminal_status",
+            "equals": "needs_input"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.02
+    },
+    {
+      "id": "BM-09",
+      "title": "Contract version gate rejects 2.0 tasks",
+      "category": "contract",
+      "mode": "unit",
+      "results": [
+        {
+          "assertion": {
+            "type": "unit",
+            "check": "contract_version_gate"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.0
+    },
+    {
+      "id": "BM-10",
+      "title": "Planner fallback only uses whitelisted registered tools",
+      "category": "contract",
+      "mode": "unit",
+      "results": [
+        {
+          "assertion": {
+            "type": "unit",
+            "check": "planner_whitelist"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.0
+    },
+    {
+      "id": "BM-11",
+      "title": "Exported JSON Schemas are valid Draft 2020-12",
+      "category": "contract",
+      "mode": "unit",
+      "results": [
+        {
+          "assertion": {
+            "type": "unit",
+            "check": "schema_export_valid"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.84
+    },
+    {
+      "id": "BM-12",
+      "title": "Offline pattern-few-shot ablation keeps deterministic plans valid and reports coverage",
+      "category": "contract",
+      "mode": "unit",
+      "results": [
+        {
+          "assertion": {
+            "type": "unit",
+            "check": "pattern_ablation_offline"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.85
+    },
+    {
+      "id": "BM-13",
+      "title": "Paper-RAG hits project as strategy-only graph nodes without leaking into evidence",
+      "category": "contract",
+      "mode": "unit",
+      "results": [
+        {
+          "assertion": {
+            "type": "unit",
+            "check": "paper_rag_graph_projection"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.0
+    },
+    {
+      "id": "BM-L1",
+      "title": "Live: Alzheimer disease full pipeline",
+      "category": "live",
+      "mode": "live",
+      "skipped": true,
+      "results": [],
+      "passed": null
+    },
+    {
+      "id": "BM-L2",
+      "title": "Live: lung adenocarcinoma with GEO omics",
+      "category": "live",
+      "mode": "live",
+      "skipped": true,
+      "results": [],
+      "passed": null
+    },
+    {
+      "id": "BM-L3",
+      "title": "Live: clinical trials evidence retrieved for LUAD oncogenes",
+      "category": "live",
+      "mode": "live",
+      "skipped": true,
+      "results": [],
+      "passed": null
+    },
+    {
+      "id": "BM-14",
+      "title": "Blind target-ranking protocol synthetic demo (freeze + score + non-compensating gates)",
+      "category": "contract",
+      "mode": "unit",
+      "results": [
+        {
+          "assertion": {
+            "type": "unit",
+            "check": "blind_protocol_synthetic"
+          },
+          "passed": true,
+          "failure": null
+        }
+      ],
+      "passed": true,
+      "elapsed_s": 0.0
+    }
+  ]
+}

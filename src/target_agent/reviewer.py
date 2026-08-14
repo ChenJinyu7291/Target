@@ -9,6 +9,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from .ablations import from_env as ablation_switches
 from .contracts import (
     ClaimClass, CoverageStatus, EvidenceItem, ReviewerFinding, TaskSpec,
     ToolResult, ToolStatus,
@@ -288,8 +289,11 @@ class Reviewer:
                 ))
             else:
                 seen_genetics[key] = item.evidence_id
-        findings.extend(self._lora_findings(task, results, evidence))
-        findings.extend(self._llm_findings(task, results, evidence))
+        if "no_reviewer_llm" in ablation_switches():
+            self.last_backend = "deterministic:ablated_no_reviewer_llm"
+        else:
+            findings.extend(self._lora_findings(task, results, evidence))
+            findings.extend(self._llm_findings(task, results, evidence))
         return self._deduplicate(findings)
 
     def _lora_findings(

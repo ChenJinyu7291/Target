@@ -33,6 +33,7 @@ def build_disease_report(
     cards: list[TargetCard],
     findings: list[ReviewerFinding],
     results: list[ToolResult],
+    tier_section: list[str] | None = None,
 ) -> tuple[dict[str, Any], str]:
     datasets = []
     genetics_trace: dict[str, Any] = {
@@ -101,6 +102,8 @@ def build_disease_report(
             f"- 信息价值最高的下一实验：{card.experiment_plan.highest_information_next_experiment}",
             f"- 停止条件：{'；'.join(card.experiment_plan.stop_conditions)}", "",
         ])
+    if tier_section:
+        lines.extend(tier_section)
     lines.extend(["## Reviewer 结论", ""])
     if findings:
         for finding in findings:

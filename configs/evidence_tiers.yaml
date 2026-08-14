@@ -1,0 +1,110 @@
+# Evidence-tier orchestration policy (mid-term review, 2026-08-06; revised 2026-08-14).
+#
+# Attribution note: the layered view is INSPIRED BY gsMAP's cross-scale integration of
+# GWAS with spatial/cellular context (gsMAP = GWAS x spatial transcriptomics, Nature 2025).
+# gsMAP itself does NOT propose a general-purpose tier ranking; this tier structure, the
+# quality_rank order and every mapping below are OUR OWN engineering hypotheses, to be
+# challenged by the ablation protocol (benchmark/compare_ablations.py + blind-ranking
+# scorer), not attributed to gsMAP.
+#
+# Mentor feedback encoded here:
+#  1. Evidence layers must NOT be consumed in a fixed pipeline order (e.g. single-cell first).
+#     Discovery starts from the highest-quality, largest-cohort evidence; downstream layers
+#     are used to cross-validate and refine, not to gate entry. "Genetics first" is an audit
+#     order, never a hard serial gate: when no GWAS/coloc data exists for a disease or subtype,
+#     the other channels proceed and the run degrades to completed_with_gaps instead of stopping.
+#  2. Single-cell data has full-transcriptome coverage but small patient cohorts; it is NOT
+#     comparable in scale to population-level (GWAS / bulk) data, so it refines context rather
+#     than anchoring discovery.
+#  3. Perturbation evidence (measured and predicted) is an explicit validation layer, wired
+#     into the same concordance matrix as every other layer.
+#  4. These tiers are orchestration and report-display METADATA only. They introduce no
+#     second weight system: scoring stays owned by the six-dimensional ScoreBreakdown
+#     contract (human_genetics 25 / disease_omics 20 / perturbation 20 / mechanism 15 /
+#     druggability 10 / safety 10), and `ranking_dimension` only maps a tier onto that
+#     existing dimension (null = the tier never scores directly).
+#
+# `quality_rank` orders discovery (1 = start here). `role` declares how the layer is used:
+#   anchor     — primary discovery signal; can nominate candidates on its own
+#   validation — confirms or refutes anchored candidates; never nominates alone
+#   context    — refines tissue/cell context of other layers; never nominates alone
+#   translation— clinical/druggability/safety framing for the final report
+#
+# `ranking_dimension` maps the layer onto the six-dimensional transparent ranking
+# (src/target_agent/ranking.py WEIGHTS); null means the layer does not score directly.
+
+tiers:
+  - id: human_genetics
+    title: Human genetics (population scale)
+    quality_rank: 1
+    role: anchor
+    ranking_dimension: human_genetics
+    examples: [GWAS / Open Targets genetics, rare-variant burden, Mendelian evidence]
+    cohort_scale: population (10^4-10^6)
+    note: Largest effective sample sizes and the strongest causal prior; discovery starts here.
+
+  - id: disease_omics_bulk
+    title: Disease omics, bulk / pseudobulk cohorts
+    quality_rank: 2
+    role: anchor
+    ranking_dimension: disease_omics
+    examples: [GEO bulk RNA-seq PyDESeq2, donor-level pseudobulk]
+    cohort_scale: cohort (10^1-10^3)
+    note: Population-comparable expression signal; cross-validates the genetic anchor in patients.
+
+  - id: perturbation_measured
+    title: Perturbation, measured response
+    quality_rank: 3
+    role: validation
+    ranking_dimension: perturbation
+    examples: [CRISPR / compound perturbation screens with OBSERVED disease alignment]
+    cohort_scale: assay (model systems)
+    note: Closest experimental proxy for causality; validates anchored targets, cannot nominate alone.
+
+  - id: single_cell_context
+    title: Single-cell context
+    quality_rank: 4
+    role: context
+    ranking_dimension: null
+    examples: [cellxgene Census, local standard single-cell inputs]
+    cohort_scale: small cohorts, full transcriptome
+    note: Full-transcriptome but small patient numbers vs population data; refines cell-type
+      context of anchored targets. Never the entry point of discovery.
+
+  - id: perturbation_predicted
+    title: Perturbation, predicted response
+    quality_rank: 5
+    role: validation
+    ranking_dimension: perturbation
+    examples: [model-predicted perturbation effect (PREDICTED claim class)]
+    cohort_scale: in silico
+    note: Hypothesis-grade only; scores at half weight and never substitutes a measured layer.
+
+  - id: literature_mechanism
+    title: Literature and mechanism
+    quality_rank: 6
+    role: validation
+    ranking_dimension: mechanism
+    examples: [Europe PMC span-validated claims, pathway tools]
+    cohort_scale: n/a
+    note: Mechanistic narrative support; feeds the mechanism concordance bonus.
+
+  - id: clinical_translation
+    title: Clinical translation and safety
+    quality_rank: 7
+    role: translation
+    ranking_dimension: druggability
+    examples: [ClinicalTrials.gov, Open Targets known drugs / tractability / safety liabilities]
+    cohort_scale: n/a
+    note: Frames the final recommendation; safety liabilities are retained as blockers, never hidden.
+
+orchestration:
+  discovery_entry: [human_genetics, disease_omics_bulk]
+  cross_validation: [perturbation_measured, literature_mechanism, perturbation_predicted]
+  context_refinement: [single_cell_context]
+  translation: [clinical_translation]
+  policy: >-
+    Discovery anchors on the highest-quality, largest-cohort tiers; every downstream tier is
+    consumed as cross-validation or context refinement. No single tier (including single-cell)
+    gates entry, and no prediction-grade tier can substitute a measured one. The order is a
+    policy, not a pipeline constraint: layers are fused by concordance, not by sequence.

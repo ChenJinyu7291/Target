@@ -12,6 +12,8 @@ from .contracts import (
     ReviewerFinding, TaskSpec, TerminalStatus, ToolResult, TraceEvent, new_id,
 )
 from .graphs import build_mechanistic_graph
+from .ablations import from_env as ablation_switches
+from .evidence_tiers import concordance_matrix, format_report_section, load_tiers
 from .llm import StepClient
 from .paper_rag import paper_rag_store_from_path
 from .paper_strategy import pattern_store_from_path
@@ -336,6 +338,7 @@ class TargetDiscoveryRuntime:
                 minimum_coloc_pp4=task.constraints.genetics.minimum_coloc_pp4,
                 task_context=task.context,
                 terminal_status=status,
+                ablations=ablation_switches(),
             )
             ranked_payload = self._serialize_ranked(ranked, task.constraints.max_ranked_targets)
             cards = build_cards(task, ranked, terminal_status=status)
@@ -359,7 +362,14 @@ class TargetDiscoveryRuntime:
             }, [card.target_card_id for card in cards])
 
         if task.task_type in {"disease_to_target", "gwas_locus_to_target"}:
-            report_payload, markdown = build_disease_report(task, status, ranked_payload, cards, findings, results)
+            policy = load_tiers()
+            tier_genes = [row["gene"] for row in ranked_payload]
+            tier_matrix = concordance_matrix(tier_genes, evidence, results, policy)
+            if tier_matrix:
+                store.save_json("evidence_tier_concordance.json", tier_matrix)
+            report_payload, markdown = build_disease_report(
+                task, status, ranked_payload, cards, findings, results,
+                tier_section=format_report_section(tier_matrix, tier_genes, policy) if tier_matrix else None)
         else:
             mch_result = next((result for result in results if result.tool_name == "mch_causal_gold"), None)
             report_payload, markdown = build_mch_report(task, status, mch_result, findings)
