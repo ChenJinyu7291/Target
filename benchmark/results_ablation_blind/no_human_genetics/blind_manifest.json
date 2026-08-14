@@ -1,0 +1,44 @@
+{
+  "contract_version": "1.0.0",
+  "benchmark_id": "target-dev-synthetic",
+  "split_id": "demo",
+  "k": 10,
+  "require_expert_adjudication": false,
+  "thresholds": {
+    "min_ndcg_at_k": 0.6,
+    "min_recall_at_k": 0.7,
+    "min_mrr_at_k": 0.6,
+    "max_trap_case_rate": 0.0,
+    "min_safety_blocker_recall": 1.0,
+    "max_unsafe_go_rate": 0.0
+  },
+  "cases": [
+    {
+      "case_id": "opaque-001",
+      "disease_group_id": "SYNTH_DISEASE_001",
+      "run_id": "run-no_human_genetics-opaque-001",
+      "task_sha256": "f6bb78cfe18581e77d157d6fc33e992a1aad392194a0ddd9c3c5ccd97e0129a0",
+      "ranking_sha256": "b1bdff0b8186152c0f5a19da0d1a2bbdb597a245b898c3883c861e1ea351a9fb",
+      "status_sha256": "248702644306379328c1ceff11ca71447b21f566f8b898afe729766e1e5a7407",
+      "bundle_sha256": "16eacdabf59d21b6526e663b1a0f846641e8cac3bb917b630ba1d623a8f02835"
+    },
+    {
+      "case_id": "opaque-002",
+      "disease_group_id": "SYNTH_DISEASE_002",
+      "run_id": "run-no_human_genetics-opaque-002",
+      "task_sha256": "60b7357fccc3ab7e93cd56f1f92a27d06ce587674aa6c37497b73bb84ce3c8c4",
+      "ranking_sha256": "25aa4f8dda9c62c4daf0e44a9db19a835749a072d46550ccafd2eb8e5ec7bea5",
+      "status_sha256": "a200105206044dd02255eea85939a7ccdd04ba27638d6393b850175bb39bd8c1",
+      "bundle_sha256": "aca749c40bc8823cb812a6d5a6ef333bd24ed5c3e09372917423ffeb7c3dbc00"
+    },
+    {
+      "case_id": "opaque-003",
+      "disease_group_id": "SYNTH_DISEASE_003",
+      "run_id": "run-no_human_genetics-opaque-003",
+      "task_sha256": "7b3be02c9d49f2f0fd5ecaa3e2a9da1c9008e394375fd665b0f046b2a5c462a9",
+      "ranking_sha256": "75d7050107307bdc34e3f3f41f696d7635145973fbdefd724b84337bbde28707",
+      "status_sha256": "9e2f256d50c5f7342b63ff7225ba5304e124e3f55a5924fbdc3b8d099689d18d",
+      "bundle_sha256": "aa5b87aac312d7dd461de82ac7731bd85554787736fefa9af64f9d03b882512f"
+    }
+  ]
+}

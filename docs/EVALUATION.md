@@ -73,6 +73,28 @@ variation. An external expert-adjudicated label set is still pending (see
 `benchmark/rubric.md`); until then all ablation numbers are development
 measurements, not publishable blind results.
 
+### Wired instrument: `benchmark/ablation_blind_ranking.py`
+
+The protocol is connected to the ablation arms on the synthetic development
+fixture (`blind_demo_labels.json`, `adjudication.status = synthetic_fixture`).
+Each arm re-ranks identical frozen synthetic evidence with the real
+`rank_targets` scorer under an evaluation-only `AblationConfig`; per-arm
+artifacts are digest-frozen, then the BM-14 scorer computes disease-macro
+nDCG@K / Recall@K / MRR@K and the non-compensating trap/safety gates. Latest
+run (`benchmark/results_ablation_blind/`):
+
+| Arm | Category | nDCG@K | Readout |
+|---|---|---:|---|
+| baseline | — | 0.9516 | all gates pass |
+| no_human_genetics | evidence_input | 0.9061 | genetics-anchored grade-3 targets drop in rank |
+| no_mechanism_bonus | scoring | 0.9464 | small ranking degradation |
+| no_perturbation_layer | evidence_input | 0.9989 | **negative delta**: on this fixture perturbation scoring pulls a grade-2 target above a grade-3 one; reported, not hidden |
+| no_context_gate | safety_negative_control | 0.9516 | ranking unchanged, but disease-mismatched evidence is ADMITTED — the correct readout for this arm |
+| no_reviewer_llm / no_planner_llm | model_component | 0.9516 | these layers do not fire inside the in-process scorer fixture; zero delta means not-measured-here |
+
+Synthetic labels only: these numbers measure mechanism behavior through ranking
+metrics, never biological performance.
+
 ## 5. Model-component ablations ("is it just the base model?")
 
 The ranking path is deterministic code, not base-model scoring. The
@@ -98,4 +120,7 @@ python benchmark/runner.py --goldset benchmark/goldset_v2.jsonl \
 
 # scorer-only blind-ranking development fixture
 python benchmark/demo_blind_ranking.py
+
+# ablation x blind-ranking matrix (synthetic fixture; per-arm nDCG/Recall/MRR/gates)
+python benchmark/ablation_blind_ranking.py
 ```

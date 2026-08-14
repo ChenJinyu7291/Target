@@ -1,0 +1,44 @@
+{
+  "contract_version": "1.0.0",
+  "benchmark_id": "target-dev-synthetic",
+  "split_id": "demo",
+  "k": 10,
+  "require_expert_adjudication": false,
+  "thresholds": {
+    "min_ndcg_at_k": 0.6,
+    "min_recall_at_k": 0.7,
+    "min_mrr_at_k": 0.6,
+    "max_trap_case_rate": 0.0,
+    "min_safety_blocker_recall": 1.0,
+    "max_unsafe_go_rate": 0.0
+  },
+  "cases": [
+    {
+      "case_id": "opaque-001",
+      "disease_group_id": "SYNTH_DISEASE_001",
+      "run_id": "run-no_mechanism_bonus-opaque-001",
+      "task_sha256": "f6bb78cfe18581e77d157d6fc33e992a1aad392194a0ddd9c3c5ccd97e0129a0",
+      "ranking_sha256": "38b1b89e24a69e9d1b0bdfde11ec9f2c9303cd4c605bc04129369d0526ca5888",
+      "status_sha256": "4e003b812912ce7d15da575338a7f3ba41f8e979d328ab0451baaf5f62c75673",
+      "bundle_sha256": "7a53c4c64c63c8e20fd82543876b57fe51f14196c83b1ef15c6673911c848031"
+    },
+    {
+      "case_id": "opaque-002",
+      "disease_group_id": "SYNTH_DISEASE_002",
+      "run_id": "run-no_mechanism_bonus-opaque-002",
+      "task_sha256": "60b7357fccc3ab7e93cd56f1f92a27d06ce587674aa6c37497b73bb84ce3c8c4",
+      "ranking_sha256": "e43134e6973aec7d70cfea91c2fee1e5ed462c1953fa040370582ec24495d159",
+      "status_sha256": "c9b5e69900e61c0bb6d3a16af1f87e902ea2b5c9a9e4843706cb4803d7c092f2",
+      "bundle_sha256": "b03a972b0d2d239eff88ef632ab54f89becd1de67ec3a4d143b2b8b62645a899"
+    },
+    {
+      "case_id": "opaque-003",
+      "disease_group_id": "SYNTH_DISEASE_003",
+      "run_id": "run-no_mechanism_bonus-opaque-003",
+      "task_sha256": "7b3be02c9d49f2f0fd5ecaa3e2a9da1c9008e394375fd665b0f046b2a5c462a9",
+      "ranking_sha256": "af3cbc6360481b1991cefdf9e50e11f79d4b696ed3525bd97547a649eca5dea9",
+      "status_sha256": "009184098043093551de8ac2d160a038bb00fee3d1d35ff8b5e81e3ec6d93126",
+      "bundle_sha256": "844cd4af58c89f70b66acbaac7de153b88caeba78de2e40a01d332ae53986b66"
+    }
+  ]
+}
